@@ -1045,7 +1045,7 @@ function planCard(plan, targetRank, targetLabel) {
   }
   const changes = plan.changes.map((change) => `<li><strong>${change.rank}</strong> · level ${change.from} → ${change.to}</li>`).join("");
   return `<div class="plan-summary"><h3>Before ${targetRank} goes ${plan.target.fromLevel} → ${plan.target.toLevel}</h3>
-    <p>Buy the following ${plan.upgrades.length} lower-item upgrade${plan.upgrades.length === 1 ? "" : "s"} first. They cost ${formatCost(plan.totalCost)} total and each was more efficient than ${targetRank}'s next upgrade at the time.</p>
+    <p>Buy the following ${plan.upgrades.length} lower-item upgrade${plan.upgrades.length === 1 ? "" : "s"} first. They cost ${formatCost(plan.totalCost)} total and each was more efficient than ${targetRank}.</p>
     <ul class="plan-list">${changes}</ul>
     <div class="inline-actions"><button type="button" class="button" id="apply-prep-plan">Apply these preparatory levels</button></div>
   </div>`;
@@ -1093,7 +1093,7 @@ function buildRoute(targetRank, excludedRanks = [], mode = "equipped") {
 
 function buildHoldingRoute() {
   if (state.levels[state.equippedRank] !== 500) {
-    ui.plannerOutput.innerHTML = `<div class="plan-summary"><h3>Set the equipped item to level 500 first</h3><p>This mode keeps the equipped item capped and uses the next-highest owned item as the target for planning.</p></div>`;
+    ui.plannerOutput.innerHTML = `<div class="plan-summary"><h3>Set the equipped item to level 500 first</h3><p>This mode keeps the equipped item capped and uses the next-highest owned item as the target for leveling.</p></div>`;
     return;
   }
   const targetIndex = rankIndex(state.equippedRank) - 1;
