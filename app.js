@@ -163,7 +163,7 @@ const DEFAULT_COST_DATA = `
 160,402180
 161,409810
 162,417540
-163,425370
+163,425360
 164,433290
 165,441310
 166,449430
@@ -212,7 +212,7 @@ const DEFAULT_COST_DATA = `
 209,900150
 210,913190
 211,926360
-212,939650
+212,939660
 213,953080
 214,966620
 215,980300
@@ -221,7 +221,7 @@ const DEFAULT_COST_DATA = `
 218,1020000
 219,1040000
 220,1050000
-221,1070000
+221,1060000
 222,1080000
 223,1090000
 224,1110000
@@ -229,18 +229,18 @@ const DEFAULT_COST_DATA = `
 226,1140000
 227,1150000
 228,1170000
-229,1190000
+229,1180000
 230,1200000
 231,1220000
 232,1230000
 233,1250000
-234,1270000
+234,1260000
 235,1280000
 236,1300000
 237,1310000
 238,1330000
 239,1350000
-240,1370000
+240,1360000
 241,1380000
 242,1400000
 243,1420000
@@ -249,258 +249,11 @@ const DEFAULT_COST_DATA = `
 246,1470000
 247,1490000
 248,1510000
-249,1530000
+249,1520000
 250,1540000
 251,1560000
 252,1580000
-253,1600000
-254,1620000
-255,1640000
-256,1660000
-257,1680000
-258,1700000
-259,1720000
-260,1740000
-261,1760000
-262,1780000
-263,1800000
-264,1820000
-265,1840000
-266,1860000
-267,1880000
-268,1900000
-269,1930000
-270,1950000
-271,1970000
-272,1990000
-273,2010000
-274,2030000
-275,2060000
-276,2080000
-277,2100000
-278,2130000
-279,2150000
-280,2170000
-281,2200000
-282,2220000
-283,2240000
-284,2270000
-285,2290000
-286,2320000
-287,2340000
-288,2360000
-289,2390000
-290,2410000
-291,2440000
-292,2460000
-293,2490000
-294,2520000
-295,2540000
-296,2570000
-297,2590000
-298,2620000
-299,2650000
-300,2670000
-301,2700000
-302,2730000
-303,2750000
-304,2780000
-305,2810000
-306,2840000
-307,2870000
-308,2890000
-309,2920000
-310,2950000
-311,2980000
-312,3010000
-313,3040000
-314,3070000
-315,3100000
-316,3130000
-317,3160000
-318,3190000
-319,3220000
-320,3250000
-321,3280000
-322,3310000
-323,3340000
-324,3370000
-325,3400000
-326,3430000
-327,3460000
-328,3500000
-329,3530000
-330,3560000
-331,3590000
-332,3630000
-333,3660000
-334,3690000
-335,3730000
-336,3760000
-337,3790000
-338,3830000
-339,3860000
-340,3900000
-341,3930000
-342,3970000
-343,4000000
-344,4040000
-345,4070000
-346,4110000
-347,4140000
-348,4180000
-349,4210000
-350,4250000
-351,4290000
-352,4320000
-353,4360000
-354,4400000
-355,4440000
-356,4470000
-357,4510000
-358,4550000
-359,4590000
-360,4630000
-361,4670000
-362,4700000
-363,4740000
-364,4780000
-365,4820000
-366,4860000
-367,4900000
-368,4940000
-369,4980000
-370,5020000
-371,5070000
-372,5110000
-373,5150000
-374,5190000
-375,5230000
-376,5270000
-377,5320000
-378,5360000
-379,5400000
-380,5440000
-381,5490000
-382,5530000
-383,5570000
-384,5620000
-385,5660000
-386,5710000
-387,5750000
-388,5800000
-389,5840000
-390,5890000
-391,5930000
-392,5980000
-393,6020000
-394,6070000
-395,6120000
-396,6160000
-397,6210000
-398,6260000
-399,6300000
-400,6350000
-401,6400000
-402,6450000
-403,6500000
-404,6550000
-405,6590000
-406,6640000
-407,6690000
-408,6740000
-409,6790000
-410,6840000
-411,6890000
-412,6940000
-413,6990000
-414,7040000
-415,7100000
-416,7150000
-417,7200000
-418,7250000
-419,7300000
-420,7360000
-421,7410000
-422,7460000
-423,7520000
-424,7570000
-425,7620000
-426,7680000
-427,7730000
-428,7790000
-429,7840000
-430,7900000
-431,7950000
-432,8010000
-433,8060000
-434,8120000
-435,8180000
-436,8230000
-437,8290000
-438,8350000
-439,8400000
-440,8460000
-441,8520000
-442,8580000
-443,8640000
-444,8690000
-445,8750000
-446,8810000
-447,8870000
-448,8930000
-449,8990000
-450,9050000
-451,9110000
-452,9170000
-453,9240000
-454,9300000
-455,9360000
-456,9420000
-457,9480000
-458,9540000
-459,9610000
-460,9670000
-461,9730000
-462,9800000
-463,9860000
-464,9930000
-465,9990000
-466,10050000
-467,10120000
-468,10190000
-469,10250000
-470,10320000
-471,10380000
-472,10450000
-473,10520000
-474,10580000
-475,10650000
-476,10720000
-477,10790000
-478,10850000
-479,10920000
-480,10990000
-481,11060000
-482,11130000
-483,11200000
-484,11270000
-485,11340000
-486,11410000
-487,11480000
-488,11550000
-489,11620000
-490,11690000
-491,11770000
-492,11840000
-493,11910000
-494,11980000
-495,12060000
-496,12130000
-497,12200000
-498,12280000
-499,12350000
-500,12430000`;
+253,1600000`;
 
 const STORAGE_KEY = "upgrade-pathfinder-v1";
 const TIER_ORDER = ["D", "C", "B", "A", "S", "SS"];
@@ -526,7 +279,6 @@ const ui = {
   currentBreakdown: document.querySelector("#current-breakdown"),
   showRawStats: document.querySelector("#show-raw-stats"),
   useRawHoldingTotals: document.querySelector("#use-raw-holding-totals"),
-  useStagedRounding: document.querySelector("#use-staged-rounding"),
   itemCount: document.querySelector("#item-count"),
   itemsBody: document.querySelector("#items-body"),
   bestUpgrade: document.querySelector("#best-upgrade"),
@@ -598,7 +350,7 @@ function loadState() {
     levels: {},
     costs: defaultCosts,
     formulas: { ...DEFAULT_FORMULAS },
-    options: { showRawStats: false, useRawHoldingTotals: false, useStagedRounding: false },
+    options: { showRawStats: false, useRawHoldingTotals: false },
   };
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
@@ -664,8 +416,8 @@ function itemStats(rankName, level) {
   };
 }
 
-// Round using half-down rule: 0.5 exactly rounds down, anything above rounds up.
-// Epsilon guards against floating point errors.
+// The game first chooses the suffix, then rounds its displayed number to two
+// decimals. Exact .5 ties go down: 0.105 becomes 0.10, while 0.1051 becomes 0.11.
 function roundHalfDown(value, decimals = 2) {
   const factor = 10 ** decimals;
   const absolute = Math.abs(value) * factor;
@@ -674,25 +426,6 @@ function roundHalfDown(value, decimals = 2) {
   const epsilon = 1e-10;
   const rounded = fraction > 0.5 + epsilon ? whole + 1 : whole;
   return Math.sign(value) * rounded / factor;
-}
-
-// Staged rounding: rounds at intermediate precision levels before final display.
-// Mimics game behavior: truncate ten-thousandths, round ten-thousandths (affecting thousands),
-// then round hundredths for display.
-function stagedRoundHalfDown(value, decimals = 2) {
-  const sign = Math.sign(value);
-  const absolute = Math.abs(value);
-  
-  // Stage 1: Truncate to ten-thousandths (4 decimals), then round to that precision.
-  let stage1 = roundHalfDown(absolute, 4);
-  
-  // Stage 2: Round the result to thousandths (3 decimals).
-  let stage2 = roundHalfDown(stage1, 3);
-  
-  // Stage 3: Round to the final display precision (usually 2 decimals).
-  let final = roundHalfDown(stage2, decimals);
-  
-  return sign * final;
 }
 
 function gameStatValue(value) {
@@ -705,13 +438,12 @@ function gameStatValue(value) {
   ];
   let unitIndex = units.findIndex((unit) => Math.abs(value) >= unit.threshold);
   let unit = units[unitIndex];
-  const roundingFn = state.options.useStagedRounding ? stagedRoundHalfDown : roundHalfDown;
-  let display = roundingFn(value / unit.divisor);
+  let display = roundHalfDown(value / unit.divisor);
   // A value such as 999.999k is displayed in the next suffix after rounding.
   if (Math.abs(display) >= 1000 && unitIndex > 0) {
     unitIndex -= 1;
     unit = units[unitIndex];
-    display = roundingFn(value / unit.divisor);
+    display = roundHalfDown(value / unit.divisor);
   }
   return { display, numeric: display * unit.divisor, suffix: unit.suffix };
 }
@@ -731,10 +463,7 @@ function formatStatPercent(value) {
 }
 
 function holdingValueForTotal(value) {
-  if (state.options.useRawHoldingTotals) return value;
-  const gameVal = gameStatValue(value);
-  // If using staged rounding, return the pre-rounded numeric value for summation
-  return state.options.useStagedRounding ? gameVal.numeric : gameVal.numeric;
+  return state.options.useRawHoldingTotals ? value : gameStatValue(value).numeric;
 }
 
 function damageSummary(levels) {
@@ -835,14 +564,13 @@ function renderFormulaInputs() {
 function renderOptions() {
   ui.showRawStats.checked = state.options.showRawStats;
   ui.useRawHoldingTotals.checked = state.options.useRawHoldingTotals;
-  ui.useStagedRounding.checked = state.options.useStagedRounding;
 }
 
 function renderSummary() {
   const summary = damageSummary(state.levels);
   ui.currentDamage.textContent = `×${formatNumber(summary.total, 5)}`;
   ui.equippedStat.textContent = `Equipped stat: +${formatStatPercent(summary.equipped)}`;
-  ui.currentBreakdown.textContent = `equip ×${formatNumber(summary.equipFactor, 5)} · H1 ×${formatNumber(summary.h1Factor, 5)} · H2 ×${formatNumber(summary.h2Factor, 5)} · H3 ×${formatNumber(summary.h3Factor, 5)}`;
+  ui.currentBreakdown.textContent = `equip ×${formatNumber(summary.equipFactor, 5)} · H1 ×${formatNumber(summary.h1Factor, 5)} · H2 ×${formatNumber(summary.h2Factor, 5)} · H3 ×${formatNumber(summary.h3Factor, 5)} · holding totals use ${state.options.useRawHoldingTotals ? "raw values" : "game display"}`;
   ui.equippedLevel.value = state.levels[state.equippedRank];
   ui.itemCount.textContent = `${ownedRanks().length} item${ownedRanks().length === 1 ? "" : "s"} owned`;
 }
@@ -931,11 +659,11 @@ function planBeforeTarget(startLevels, targetRank, excludedRanks = []) {
 function planCard(plan, targetRank, targetLabel) {
   if (!plan.ok) return `<div class="plan-summary"><h3>Cannot plan this step yet</h3><p>${plan.reason}</p></div>`;
   if (!plan.changes.length) {
-    return `<div class="plan-summary"><h3>${targetLabel} is already the best next buy</h3><p>No other owned item beats its next-upgrade damage-per-cost at the current levels. Upgrade ${targetRank} directly.</p></div>`;
+    return `<div class="plan-summary"><h3>${targetLabel} is already the best next buy</h3><p>No other owned item beats its next-upgrade damage-per-cost at the current levels. Upgrade ${targetRank} from level ${plan.target.fromLevel} to ${plan.target.toLevel} next.</p></div>`;
   }
   const changes = plan.changes.map((change) => `<li><strong>${change.rank}</strong> · level ${change.from} → ${change.to}</li>`).join("");
   return `<div class="plan-summary"><h3>Before ${targetRank} goes ${plan.target.fromLevel} → ${plan.target.toLevel}</h3>
-    <p>Buy the following ${plan.upgrades.length} lower-item upgrade${plan.upgrades.length === 1 ? "" : "s"} first. They cost ${formatCost(plan.totalCost)} total and each was more efficient than ${targetRank}.</p>
+    <p>Buy the following ${plan.upgrades.length} lower-item upgrade${plan.upgrades.length === 1 ? "" : "s"} first. They cost ${formatCost(plan.totalCost)} total and each was more efficient than ${targetRank}'s next level when chosen.</p>
     <ul class="plan-list">${changes}</ul>
     <div class="inline-actions"><button type="button" class="button" id="apply-prep-plan">Apply these preparatory levels</button></div>
   </div>`;
@@ -949,7 +677,7 @@ function showPlanBeforeEquipped() {
     applyButton.addEventListener("click", () => {
       state.levels = pendingPlan.levels;
       renderAll();
-      ui.plannerOutput.innerHTML = `<div class="plan-summary"><h3>Preparatory levels applied</h3><p>The build now reflects the recommended stopping levels. Recalculate or plan again when you are ready.</p></div>`;
+      ui.plannerOutput.innerHTML = `<div class="plan-summary"><h3>Preparatory levels applied</h3><p>The build now reflects the recommended stopping levels. Recalculate or plan again when you are ready for the next decision.</p></div>`;
     });
   }
 }
@@ -976,7 +704,7 @@ function buildRoute(targetRank, excludedRanks = [], mode = "equipped") {
   }
   const list = route.map((step) => {
     const changes = step.changes.length ? step.changes.map((change) => `${change.rank} ${change.from}→${change.to}`).join(", ") : "no preparatory lower upgrades";
-    return `<div class="route-row"><strong>Before ${targetRank} ${step.from} → ${step.to}</strong> — ${changes} <span class="quiet">(${step.actionCount} prep upgrade${step.actionCount === 1 ? "" : "s"}, ${formatCost(step.cost)})</span></div>`;
+    return `<div class="route-row"><strong>Before ${targetRank} ${step.from} → ${step.to}</strong> — ${changes} <span class="quiet">(${step.actionCount} prep upgrade${step.actionCount === 1 ? "" : "s"}; ${formatCost(step.cost)})</span></div>`;
   }).join("");
   ui.plannerOutput.innerHTML = `<div class="plan-summary"><h3>${title}</h3><p>Calculated ${route.length} target upgrades from the current build. The route stops because: ${stopReason}</p><div class="route-list">${list}</div></div>`;
 }
@@ -1027,11 +755,6 @@ function attachEvents() {
   });
   ui.useRawHoldingTotals.addEventListener("change", () => {
     state.options.useRawHoldingTotals = ui.useRawHoldingTotals.checked;
-    pendingPlan = null;
-    renderAll();
-  });
-  ui.useStagedRounding.addEventListener("change", () => {
-    state.options.useStagedRounding = ui.useStagedRounding.checked;
     pendingPlan = null;
     renderAll();
   });
