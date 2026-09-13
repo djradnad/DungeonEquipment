@@ -279,6 +279,7 @@ const ui = {
   currentBreakdown: document.querySelector("#current-breakdown"),
   showRawStats: document.querySelector("#show-raw-stats"),
   useRawHoldingTotals: document.querySelector("#use-raw-holding-totals"),
+  useStagedRounding: document.querySelector("#use-staged-rounding"),
   itemCount: document.querySelector("#item-count"),
   itemsBody: document.querySelector("#items-body"),
   bestUpgrade: document.querySelector("#best-upgrade"),
@@ -350,7 +351,7 @@ function loadState() {
     levels: {},
     costs: defaultCosts,
     formulas: { ...DEFAULT_FORMULAS },
-    options: { showRawStats: false, useRawHoldingTotals: false },
+    options: { showRawStats: false, useRawHoldingTotals: false, useStagedRounding: false },
   };
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
@@ -416,8 +417,8 @@ function itemStats(rankName, level) {
   };
 }
 
-// The game first chooses the suffix, then rounds its displayed number to two
-// decimals. Exact .5 ties go down: 0.105 becomes 0.10, while 0.1051 becomes 0.11.
+// Round using half-down rule: 0.5 exactly rounds down, anything above rounds up.
+// Epsilon guards against floating point errors.
 function roundHalfDown(value, decimals = 2) {
   const factor = 10 ** decimals;
   const absolute = Math.abs(value) * factor;
@@ -426,6 +427,25 @@ function roundHalfDown(value, decimals = 2) {
   const epsilon = 1e-10;
   const rounded = fraction > 0.5 + epsilon ? whole + 1 : whole;
   return Math.sign(value) * rounded / factor;
+}
+
+// Staged rounding: rounds at intermediate precision levels before final display.
+// Mimics game behavior: truncate ten-thousandths, round ten-thousandths (affecting thousands),
+// then round hundredths for display.
+function stagedRoundHalfDown(value, decimals = 2) {
+  const sign = Math.sign(value);
+  const absolute = Math.abs(value);
+  
+  // Stage 1: Truncate to ten-thousandths (4 decimals), then round to that precision.
+  let stage1 = roundHalfDown(absolute, 4);
+  
+  // Stage 2: Round the result to thousandths (3 decimals).
+  let stage2 = roundHalfDown(stage1, 3);
+  
+  // Stage 3: Round to the final display precision (usually 2 decimals).
+  let final = roundHalfDown(stage2, decimals);
+  
+  return sign * final;
 }
 
 function gameStatValue(value) {
@@ -438,12 +458,13 @@ function gameStatValue(value) {
   ];
   let unitIndex = units.findIndex((unit) => Math.abs(value) >= unit.threshold);
   let unit = units[unitIndex];
-  let display = roundHalfDown(value / unit.divisor);
+  const roundingFn = state.options.useStagedRounding ? stagedRoundHalfDown : roundHalfDown;
+  let display = roundingFn(value / unit.divisor);
   // A value such as 999.999k is displayed in the next suffix after rounding.
   if (Math.abs(display) >= 1000 && unitIndex > 0) {
     unitIndex -= 1;
     unit = units[unitIndex];
-    display = roundHalfDown(value / unit.divisor);
+    display = roundingFn(value / unit.divisor);
   }
   return { display, numeric: display * unit.divisor, suffix: unit.suffix };
 }
@@ -463,7 +484,10 @@ function formatStatPercent(value) {
 }
 
 function holdingValueForTotal(value) {
-  return state.options.useRawHoldingTotals ? value : gameStatValue(value).numeric;
+  if (state.options.useRawHoldingTotals) return value;
+  const gameVal = gameStatValue(value);
+  // If using staged rounding, return the pre-rounded numeric value for summation
+  return state.options.useStagedRounding ? gameVal.numeric : gameVal.numeric;
 }
 
 function damageSummary(levels) {
@@ -564,13 +588,14 @@ function renderFormulaInputs() {
 function renderOptions() {
   ui.showRawStats.checked = state.options.showRawStats;
   ui.useRawHoldingTotals.checked = state.options.useRawHoldingTotals;
+  ui.useStagedRounding.checked = state.options.useStagedRounding;
 }
 
 function renderSummary() {
   const summary = damageSummary(state.levels);
   ui.currentDamage.textContent = `×${formatNumber(summary.total, 5)}`;
   ui.equippedStat.textContent = `Equipped stat: +${formatStatPercent(summary.equipped)}`;
-  ui.currentBreakdown.textContent = `equip ×${formatNumber(summary.equipFactor, 5)} · H1 ×${formatNumber(summary.h1Factor, 5)} · H2 ×${formatNumber(summary.h2Factor, 5)} · H3 ×${formatNumber(summary.h3Factor, 5)} · holding totals use ${state.options.useRawHoldingTotals ? "raw values" : "game display"}`;
+  ui.currentBreakdown.textContent = `equip ×${formatNumber(summary.equipFactor, 5)} · H1 ×${formatNumber(summary.h1Factor, 5)} · H2 ×${formatNumber(summary.h2Factor, 5)} · H3 ×${formatNumber(summary.h3Factor, 5)}`;
   ui.equippedLevel.value = state.levels[state.equippedRank];
   ui.itemCount.textContent = `${ownedRanks().length} item${ownedRanks().length === 1 ? "" : "s"} owned`;
 }
@@ -659,11 +684,11 @@ function planBeforeTarget(startLevels, targetRank, excludedRanks = []) {
 function planCard(plan, targetRank, targetLabel) {
   if (!plan.ok) return `<div class="plan-summary"><h3>Cannot plan this step yet</h3><p>${plan.reason}</p></div>`;
   if (!plan.changes.length) {
-    return `<div class="plan-summary"><h3>${targetLabel} is already the best next buy</h3><p>No other owned item beats its next-upgrade damage-per-cost at the current levels. Upgrade ${targetRank} from level ${plan.target.fromLevel} to ${plan.target.toLevel} next.</p></div>`;
+    return `<div class="plan-summary"><h3>${targetLabel} is already the best next buy</h3><p>No other owned item beats its next-upgrade damage-per-cost at the current levels. Upgrade ${targetRank} directly.</p></div>`;
   }
   const changes = plan.changes.map((change) => `<li><strong>${change.rank}</strong> · level ${change.from} → ${change.to}</li>`).join("");
   return `<div class="plan-summary"><h3>Before ${targetRank} goes ${plan.target.fromLevel} → ${plan.target.toLevel}</h3>
-    <p>Buy the following ${plan.upgrades.length} lower-item upgrade${plan.upgrades.length === 1 ? "" : "s"} first. They cost ${formatCost(plan.totalCost)} total and each was more efficient than ${targetRank}'s next level when chosen.</p>
+    <p>Buy the following ${plan.upgrades.length} lower-item upgrade${plan.upgrades.length === 1 ? "" : "s"} first. They cost ${formatCost(plan.totalCost)} total and each was more efficient than ${targetRank}.</p>
     <ul class="plan-list">${changes}</ul>
     <div class="inline-actions"><button type="button" class="button" id="apply-prep-plan">Apply these preparatory levels</button></div>
   </div>`;
@@ -677,7 +702,7 @@ function showPlanBeforeEquipped() {
     applyButton.addEventListener("click", () => {
       state.levels = pendingPlan.levels;
       renderAll();
-      ui.plannerOutput.innerHTML = `<div class="plan-summary"><h3>Preparatory levels applied</h3><p>The build now reflects the recommended stopping levels. Recalculate or plan again when you are ready for the next decision.</p></div>`;
+      ui.plannerOutput.innerHTML = `<div class="plan-summary"><h3>Preparatory levels applied</h3><p>The build now reflects the recommended stopping levels. Recalculate or plan again when you are ready.</p></div>`;
     });
   }
 }
@@ -704,7 +729,7 @@ function buildRoute(targetRank, excludedRanks = [], mode = "equipped") {
   }
   const list = route.map((step) => {
     const changes = step.changes.length ? step.changes.map((change) => `${change.rank} ${change.from}→${change.to}`).join(", ") : "no preparatory lower upgrades";
-    return `<div class="route-row"><strong>Before ${targetRank} ${step.from} → ${step.to}</strong> — ${changes} <span class="quiet">(${step.actionCount} prep upgrade${step.actionCount === 1 ? "" : "s"}; ${formatCost(step.cost)})</span></div>`;
+    return `<div class="route-row"><strong>Before ${targetRank} ${step.from} → ${step.to}</strong> — ${changes} <span class="quiet">(${step.actionCount} prep upgrade${step.actionCount === 1 ? "" : "s"}, ${formatCost(step.cost)})</span></div>`;
   }).join("");
   ui.plannerOutput.innerHTML = `<div class="plan-summary"><h3>${title}</h3><p>Calculated ${route.length} target upgrades from the current build. The route stops because: ${stopReason}</p><div class="route-list">${list}</div></div>`;
 }
@@ -755,6 +780,11 @@ function attachEvents() {
   });
   ui.useRawHoldingTotals.addEventListener("change", () => {
     state.options.useRawHoldingTotals = ui.useRawHoldingTotals.checked;
+    pendingPlan = null;
+    renderAll();
+  });
+  ui.useStagedRounding.addEventListener("change", () => {
+    state.options.useStagedRounding = ui.useStagedRounding.checked;
     pendingPlan = null;
     renderAll();
   });
