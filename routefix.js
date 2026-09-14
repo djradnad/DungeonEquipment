@@ -90,7 +90,6 @@
     document.querySelector("#items-body")?.addEventListener("change",()=>setTimeout(renderBest,50));
     document.querySelector("#build-equipped-route")?.addEventListener("click",()=>setTimeout(combineNoPrep,40));
     document.querySelector("#plan-holding-route")?.addEventListener("click",()=>setTimeout(combineNoPrep,40));
-    new MutationObserver(hideRaw).observe(document.body,{childList:true,subtree:true});
   }
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install);else install();
 })();
