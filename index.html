@@ -39,7 +39,7 @@
 
       <section class="card planner-card" aria-labelledby="planner-heading">
         <div class="section-heading"><div><p class="eyebrow">BREAKPOINT PLANNER</p><h2 id="planner-heading">Levels worth buying before the target item</h2></div></div>
-        <p class="help-text">Buy lower-item upgrades only while each one gives more damage per cost than the target item’s next level. Consecutive target levels with the same preparation are shown as a single range.</p>
+        <p class="help-text">Each target level is evaluated independently. The planner recalculates the most efficient lower-item stopping levels for that specific equipped upgrade instead of carrying previous preparation levels forward.</p>
         <div class="planner-controls"><button type="button" class="button secondary" id="plan-before-equipped">Plan before equipped item’s next level</button><button type="button" class="button secondary" id="build-equipped-route">Build equipped route through known costs</button><button type="button" class="button secondary" id="plan-holding-route">Plan holding-only route after level 500</button></div>
         <div id="planner-output" class="planner-output" aria-live="polite"><p class="empty-state">Choose a planner action to see the recommended stopping levels.</p></div>
       </section>
