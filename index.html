@@ -9,66 +9,30 @@
   </head>
   <body>
     <main class="page-shell">
-      <header class="hero manga-hero">
-        <div class="hero-art" aria-hidden="true">
-          <div class="moon"></div>
-          <div class="dungeon-gate"><i></i><i></i><i></i></div>
-          <div class="hero-spark s1">✦</div><div class="hero-spark s2">✧</div><div class="hero-spark s3">✦</div>
-        </div>
-        <div class="hero-copy">
-          <p class="eyebrow">UNOFFICIAL FAN TOOL · DUNGEON ODYSSEY</p>
-          <h1>Upgrade<br><em>Pathfinder</em></h1>
-          <p class="lede">Find the next item upgrade that gives the most damage for its cost.</p>
-          <div class="hero-tags"><span>WEB NOVEL ENERGY</span><span>OTAKU MATH</span><span>DO NOT WASTE GOLD</span></div>
-        </div>
-      </header>
-
       <section class="card setup-card" aria-labelledby="setup-heading">
         <div class="section-heading">
           <div><p class="eyebrow">CURRENT BUILD</p><h2 id="setup-heading">What do you own?</h2></div>
           <div class="section-actions">
-            <label class="micro-toggle">
-              <input id="use-raw-holding-totals" type="checkbox" />
-              <span>use raw holding totals</span>
-            </label>
+            <label class="micro-toggle"><input id="use-raw-holding-totals" type="checkbox" /><span>use raw holding totals</span></label>
             <button type="button" class="button ghost" id="reset-levels">Reset all owned items to level 1</button>
           </div>
         </div>
         <div class="setup-grid">
-          <label>
-            Highest item / equipped item
-            <select id="equipped-rank" aria-describedby="owned-help"></select>
-            <small id="owned-help">Every lower rank is included as owned.</small>
-          </label>
-          <label>
-            Equipped item level
-            <input id="equipped-level" type="number" min="1" max="500" value="1" inputmode="numeric" />
-            <small>Items unlock at level 1.</small>
-          </label>
-          <div class="stat-readout" aria-live="polite">
-            <span>Current damage multiplier</span>
-            <strong id="current-damage">—</strong>
-            <small id="equipped-stat">Equipped stat: —</small>
-            <small id="current-breakdown">—</small>
-          </div>
+          <label>Highest item / equipped item<select id="equipped-rank" aria-describedby="owned-help"></select><small id="owned-help">Every lower rank is included as owned.</small></label>
+          <label>Equipped item level<input id="equipped-level" type="number" min="1" max="500" value="1" inputmode="numeric" /><small>Items unlock at level 1.</small></label>
+          <div class="stat-readout" aria-live="polite"><span>Current damage multiplier</span><strong id="current-damage">—</strong><small id="equipped-stat">Equipped stat: —</small><small id="current-breakdown">—</small></div>
         </div>
         <div class="sr-only" aria-hidden="true"><input id="show-raw-stats" type="checkbox" /></div>
       </section>
 
       <section class="card" aria-labelledby="items-heading">
-        <div class="section-heading items-heading">
-          <div><p class="eyebrow">OWNED ITEMS</p><h2 id="items-heading">Set current item levels</h2></div>
-          <span class="quiet" id="item-count">—</span>
-        </div>
+        <div class="section-heading items-heading"><div><p class="eyebrow">OWNED ITEMS</p><h2 id="items-heading">Set current item levels</h2></div><span class="quiet" id="item-count">—</span></div>
         <p class="help-text">The highest item supplies its equip stat. Every owned item supplies its holding stats. Holding stats 1, 2, and 3 each sum separately, then their three multipliers are multiplied with the equip multiplier. Values update as you type.</p>
         <div class="table-wrap"><table class="items-table"><thead><tr><th>Item</th><th>Level</th><th>Next cost</th><th>Holding stats at current level</th><th>Next-upgrade efficiency</th></tr></thead><tbody id="items-body"></tbody></table></div>
       </section>
 
       <section class="card results-card" aria-labelledby="next-heading">
-        <div class="section-heading">
-          <div><p class="eyebrow">DECISION</p><h2 id="next-heading">Best next upgrade</h2></div>
-          <div class="button-row"><button type="button" class="button secondary" id="refresh-results">Recalculate</button><button type="button" class="button" id="apply-best">Apply best next upgrade</button></div>
-        </div>
+        <div class="section-heading"><div><p class="eyebrow">DECISION</p><h2 id="next-heading">Best next upgrade</h2></div><div class="button-row"><button type="button" class="button secondary" id="refresh-results">Recalculate</button><button type="button" class="button" id="apply-best">Apply best next upgrade</button></div></div>
         <div id="best-upgrade" class="best-upgrade" aria-live="polite"></div>
         <div class="table-wrap compact-table-wrap"><table class="ranking-table"><thead><tr><th>Rank</th><th>Upgrade</th><th>Damage gain</th><th>Cost</th><th>Gain per 1M cost</th></tr></thead><tbody id="ranking-body"></tbody></table></div>
       </section>
@@ -93,6 +57,6 @@
       <footer><span>UNOFFICIAL FAN TOOL</span> · runs entirely in your browser · <span>made for dungeon enjoyers</span></footer>
     </main>
     <script src="app.js"></script>
-    <script src="routefix.js"></script>
+    <script src="ui-fixes.js"></script>
   </body>
 </html>
