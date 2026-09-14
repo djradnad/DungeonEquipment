@@ -12,10 +12,7 @@
       <section class="card setup-card" aria-labelledby="setup-heading">
         <div class="section-heading">
           <div><p class="eyebrow">CURRENT BUILD</p><h2 id="setup-heading">What do you own?</h2></div>
-          <div class="section-actions">
-            <label class="micro-toggle"><input id="use-raw-holding-totals" type="checkbox" /><span>use raw holding totals</span></label>
-            <button type="button" class="button ghost" id="reset-levels">Reset all owned items to level 1</button>
-          </div>
+          <div class="section-actions"><label class="micro-toggle"><input id="use-raw-holding-totals" type="checkbox" /><span>use raw holding totals</span></label><button type="button" class="button ghost" id="reset-levels">Reset all owned items to level 1</button></div>
         </div>
         <div class="setup-grid">
           <label>Highest item / equipped item<select id="equipped-rank" aria-describedby="owned-help"></select><small id="owned-help">Every lower rank is included as owned.</small></label>
@@ -24,39 +21,31 @@
         </div>
         <div class="sr-only" aria-hidden="true"><input id="show-raw-stats" type="checkbox" /></div>
       </section>
-
       <section class="card" aria-labelledby="items-heading">
         <div class="section-heading items-heading"><div><p class="eyebrow">OWNED ITEMS</p><h2 id="items-heading">Set current item levels</h2></div><span class="quiet" id="item-count">—</span></div>
         <p class="help-text">The highest item supplies its equip stat. Every owned item supplies its holding stats. Holding stats 1, 2, and 3 each sum separately, then their three multipliers are multiplied with the equip multiplier. Values update as you type.</p>
         <div class="table-wrap"><table class="items-table"><thead><tr><th>Item</th><th>Level</th><th>Next cost</th><th>Holding stats at current level</th><th>Next-upgrade efficiency</th></tr></thead><tbody id="items-body"></tbody></table></div>
       </section>
-
       <section class="card results-card" aria-labelledby="next-heading">
         <div class="section-heading"><div><p class="eyebrow">DECISION</p><h2 id="next-heading">Best next upgrade</h2></div><div class="button-row"><button type="button" class="button secondary" id="refresh-results">Recalculate</button><button type="button" class="button" id="apply-best">Apply best next upgrade</button></div></div>
         <div id="best-upgrade" class="best-upgrade" aria-live="polite"></div>
         <div class="table-wrap compact-table-wrap"><table class="ranking-table"><thead><tr><th>Rank</th><th>Upgrade</th><th>Damage gain</th><th>Cost</th><th>Gain per 1M cost</th></tr></thead><tbody id="ranking-body"></tbody></table></div>
       </section>
-
       <section class="card planner-card" aria-labelledby="planner-heading">
         <div class="section-heading"><div><p class="eyebrow">BREAKPOINT PLANNER</p><h2 id="planner-heading">Levels worth buying before the target item</h2></div></div>
         <p class="help-text">Each target level is evaluated independently. The planner recalculates the most efficient lower-item stopping levels for that specific equipped upgrade instead of carrying previous preparation levels forward.</p>
         <div class="planner-controls"><button type="button" class="button secondary" id="plan-before-equipped">Plan before equipped item’s next level</button><button type="button" class="button secondary" id="build-equipped-route">Build equipped route through known costs</button><button type="button" class="button secondary" id="plan-holding-route">Plan holding-only route after level 500</button></div>
         <div id="planner-output" class="planner-output" aria-live="polite"><p class="empty-state">Choose a planner action to see the recommended stopping levels.</p></div>
       </section>
-
       <section class="card details-card" aria-labelledby="details-heading">
         <div class="section-heading"><div><p class="eyebrow">STAT FORMULAS</p><h2 id="details-heading">Formula reference</h2></div></div>
         <p class="help-text">These are the current stat formulas used by the planner. They are reference values only and are not editable here.</p>
-        <div class="formula-note"><p><strong>Base values at level 1:</strong> Equip D1 = <code>10.2%</code>; Holding 1 D1 = <code>1.01%</code>; Holding 2 S1 = <code>15.78125%</code>; Holding 3 SS1 = <code>6.3125%</code>.</p><p><strong>Per-level growth:</strong> Equip = <code>×1.02</code> per level; Holding stats = <code>×1.01</code> per level.</p><p><strong>Rank scaling:</strong> D–A use <code>5^tier × 1.5^(rank − 1)</code>; S uses <code>625 × 2^(rank − 1)</code>; SS starts at S4 × 2.5 and uses 2.5× per rank; SSS is SS4 × 12.5.</p><p>Holding stat 2 starts at S1 and holding stat 3 starts at SS1.</p></div>
+        <div class="formula-note"><p><strong>Base values at level 1:</strong> Equip D1 = <code>10.2%</code>; Holding 1 D1 = <code>1.01%</code>; Holding 2 S1 = <code>15.78125%</code>; Holding 3 SS1 = <code>6.3125%</code>.</p><p><strong>Per-level growth:</strong> Equip = <code>×1.02</code>; Holding stats = <code>×1.01</code>.</p><p><strong>Rank scaling:</strong> D–A use <code>5^tier × 1.5^(rank − 1)</code>; S uses <code>625 × 2^(rank − 1)</code>; SS starts at S4 × 2.5 and uses 2.5× per rank; SSS is SS4 × 12.5.</p><p>Holding stat 2 starts at S1 and holding stat 3 starts at SS1.</p></div>
       </section>
-
-      <div hidden aria-hidden="true">
-        <input id="use-staged-rounding" type="checkbox" /><textarea id="cost-data"></textarea><button id="apply-costs" type="button"></button><button id="restore-costs" type="button"></button><span id="cost-status"></span>
-        <input id="base-equip" type="number" /><input id="base-h1" type="number" /><input id="base-h2" type="number" /><input id="base-h3" type="number" /><input id="equip-growth" type="number" /><input id="holding-growth" type="number" /><button id="apply-formulas" type="button"></button><span id="formula-status"></span>
-      </div>
+      <div hidden aria-hidden="true"><input id="use-staged-rounding" type="checkbox" /><textarea id="cost-data"></textarea><button id="apply-costs" type="button"></button><button id="restore-costs" type="button"></button><span id="cost-status"></span><input id="base-equip" type="number" /><input id="base-h1" type="number" /><input id="base-h2" type="number" /><input id="base-h3" type="number" /><input id="equip-growth" type="number" /><input id="holding-growth" type="number" /><button id="apply-formulas" type="button"></button><span id="formula-status"></span></div>
       <footer><span>UNOFFICIAL FAN TOOL</span> · runs entirely in your browser · <span>made for dungeon enjoyers</span></footer>
     </main>
-    <script src="app.js"></script>
-    <script src="ui-fixes.js"></script>
+    <script src="app.js?v=20260915"></script>
+    <script src="ui-fixes.js?v=20260915"></script>
   </body>
 </html>
