@@ -17,7 +17,7 @@
 
       <section class="notice" aria-label="Cost coverage notice">
         <span class="notice-icon" aria-hidden="true">i</span>
-        <div><strong>Known cost coverage: levels 2–253.</strong> Add future costs in the data panel as you collect them. The planner never invents unknown prices.</div>
+        <div><strong>Known cost coverage: levels 2–253.</strong> The planner only uses costs that are known.</div>
       </section>
 
       <section class="card setup-card" aria-labelledby="setup-heading">
@@ -49,7 +49,7 @@
         <div class="stat-options" aria-label="Stat display and calculation options">
           <label class="toggle-control">
             <input id="show-raw-stats" type="checkbox" />
-            <span class="toggle-copy"><strong>Show raw stat values</strong><small>Off uses the game-style suffix and two-decimal, round-half-down display.</small></span>
+            <span class="toggle-copy"><strong>Show raw stat values</strong><small>Off uses the game-style suffix and two-decimal display.</small></span>
           </label>
           <label class="toggle-control">
             <input id="use-raw-holding-totals" type="checkbox" />
@@ -126,40 +126,38 @@
       <section class="card details-card" aria-labelledby="details-heading">
         <div class="section-heading">
           <div>
-            <p class="eyebrow">DATA &amp; FORMULAS</p>
-            <h2 id="details-heading">Keep the tool accurate as you learn more</h2>
+            <p class="eyebrow">STAT FORMULAS</p>
+            <h2 id="details-heading">Formula reference</h2>
           </div>
         </div>
-        <details>
-          <summary>Observed level-up costs</summary>
-          <p class="help-text">One line per upgrade: <code>new level, cost</code>. Values such as <code>1.60M</code> and <code>270k</code> are accepted. Apply the data after editing; it is saved only in this browser.</p>
-          <textarea id="cost-data" spellcheck="false" rows="12" aria-label="Observed level-up costs"></textarea>
-          <div class="inline-actions">
-            <button type="button" class="button secondary" id="apply-costs">Apply cost data</button>
-            <button type="button" class="button ghost" id="restore-costs">Restore supplied costs</button>
-            <span id="cost-status" class="quiet" aria-live="polite"></span>
-          </div>
-        </details>
-        <details>
-          <summary>Stat formula settings</summary>
-          <p class="help-text">The defaults use the level-1 percentages you supplied. A level increase multiplies the displayed stat by its stated level multiplier. Adjust these inputs if a new in-game measurement refines a starting value.</p>
-          <div class="formula-grid">
-            <label>Equip stat at D1 level 1 (%)<input id="base-equip" type="number" min="0" step="any" value="10.2" /></label>
-            <label>Holding stat 1 at D1 level 1 (%)<input id="base-h1" type="number" min="0" step="any" value="1.01" /></label>
-            <label>Holding stat 2 at S1 level 1 (%)<input id="base-h2" type="number" min="0" step="any" value="15.78125" /></label>
-            <label>Holding stat 3 at SS1 level 1 (%)<input id="base-h3" type="number" min="0" step="any" value="6.3125" /></label>
-            <label>Equip stat per-level multiplier<input id="equip-growth" type="number" min="1" step="any" value="1.02" /></label>
-            <label>Holding stat per-level multiplier<input id="holding-growth" type="number" min="1" step="any" value="1.01" /></label>
-          </div>
-          <div class="inline-actions">
-            <button type="button" class="button secondary" id="apply-formulas">Apply formula settings</button>
-            <span id="formula-status" class="quiet" aria-live="polite"></span>
-          </div>
-          <p class="formula-note">Rank scaling: D–A use <code>5<sup>tier</sup> × 1.5<sup>rank − 1</sup></code>; S uses <code>625 × 2<sup>rank − 1</sup></code>; SS starts at S4 × 2.5 and uses 2.5 per rank; SSS is SS4 × 12.5. Holding stat 2 starts at S1 and holding stat 3 at SS1.</p>
-        </details>
+        <p class="help-text">These are the current stat formulas used by the planner. They are reference values only and are not editable here.</p>
+        <div class="formula-note">
+          <p><strong>Base values at level 1:</strong> Equip D1 = <code>10.2%</code>; Holding 1 D1 = <code>1.01%</code>; Holding 2 S1 = <code>15.78125%</code>; Holding 3 SS1 = <code>6.3125%</code>.</p>
+          <p><strong>Per-level growth:</strong> Equip = <code>×1.02</code> per level; Holding stats = <code>×1.01</code> per level.</p>
+          <p><strong>Rank scaling:</strong> D–A use <code>5^tier × 1.5^(rank − 1)</code>; S uses <code>625 × 2^(rank − 1)</code>; SS starts at S4 × 2.5 and uses 2.5× per rank; SSS is SS4 × 12.5.</p>
+          <p>Holding stat 2 starts at S1 and holding stat 3 starts at SS1.</p>
+        </div>
       </section>
 
-      <footer>Runs entirely in your browser. Share this folder as a static site when you are ready.</footer>
+      <!-- Compatibility controls for the existing calculator code. They are intentionally hidden;
+           the old editable data/formula UI has been removed from the page. -->
+      <div hidden aria-hidden="true">
+        <input id="use-staged-rounding" type="checkbox" />
+        <textarea id="cost-data"></textarea>
+        <button id="apply-costs" type="button"></button>
+        <button id="restore-costs" type="button"></button>
+        <span id="cost-status"></span>
+        <input id="base-equip" type="number" />
+        <input id="base-h1" type="number" />
+        <input id="base-h2" type="number" />
+        <input id="base-h3" type="number" />
+        <input id="equip-growth" type="number" />
+        <input id="holding-growth" type="number" />
+        <button id="apply-formulas" type="button"></button>
+        <span id="formula-status"></span>
+      </div>
+
+      <footer>Runs entirely in your browser.</footer>
     </main>
     <script src="app.js"></script>
   </body>
