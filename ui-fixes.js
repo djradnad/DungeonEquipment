@@ -19,13 +19,8 @@
   }
 
   function rankIndex(rankName) { return RANKS.findIndex((rank) => rank.name === rankName); }
+  function ownedRanks(equippedRank) { return RANKS.slice(0, rankIndex(equippedRank) + 1); }
 
-  function ownedRanks(equippedRank) {
-    return RANKS.slice(0, rankIndex(equippedRank) + 1);
-  }
-
-  // The previous UI work could leave an old test selection of SSS in localStorage.
-  // Migrate that one stale selection back to the site's normal SS2 starting point.
   function migrateStaleSSSSelection() {
     if (localStorage.getItem(MIGRATION_KEY)) return;
     const state = savedState();
@@ -94,33 +89,22 @@
     return Math.sign(value) * (fraction > 0.5 + 1e-10 ? whole + 1 : whole) / factor;
   }
 
-  function letterSuffix(index) {
-    if (index < 0) return "";
-    if (index < 26) return String.fromCharCode(97 + index);
-    const letter = String.fromCharCode(97 + ((index - 26) % 26));
-    return letter.repeat(Math.floor((index - 26) / 26) + 2);
-  }
-
   function gameStatValue(value) {
     const absolute = Math.abs(value);
     if (absolute === 0) return { numeric: 0 };
     let divisor;
-    let suffixIndex;
-    if (absolute >= 1e15) suffixIndex = Math.floor(Math.log10(absolute) / 3) - 5;
-    if (suffixIndex !== undefined) divisor = 10 ** ((suffixIndex + 5) * 3);
+    if (absolute >= 1e15) divisor = 10 ** ((Math.floor(Math.log10(absolute) / 3) - 5 + 5) * 3);
     else if (absolute >= 1e12) divisor = 1e12;
     else if (absolute >= 1e9) divisor = 1e9;
     else if (absolute >= 1e6) divisor = 1e6;
     else if (absolute >= 1e3) divisor = 1e3;
     else divisor = 1;
     let display = roundHalfDown(value / divisor);
-    if (Math.abs(display) >= 1000 && divisor > 1) display = roundHalfDown(value / (divisor * 1000));
-    return { numeric: display * (Math.abs(display) >= 1000 && divisor > 1 ? divisor * 1000 : divisor) };
+    if (Math.abs(display) >= 1000 && divisor > 1) { divisor *= 1000; display = roundHalfDown(value / divisor); }
+    return { numeric: display * divisor };
   }
 
-  function holdingValueForTotal(value, useRawHoldingTotals) {
-    return useRawHoldingTotals ? value : gameStatValue(value).numeric;
-  }
+  function holdingValueForTotal(value, useRawHoldingTotals) { return useRawHoldingTotals ? value : gameStatValue(value).numeric; }
 
   function damageTotal(levels, equippedRank, formulas, useRawHoldingTotals) {
     let h1 = 0, h2 = 0, h3 = 0;
@@ -139,6 +123,35 @@
     return Number.isFinite(cost) && cost > 0 ? cost : null;
   }
 
+  function readCostTable() {
+    const state = savedState();
+    const costs = { ...(state.costs || {}) };
+    const textarea = document.querySelector("#cost-data");
+    if (textarea?.value?.trim()) {
+      textarea.value.split(/\r?\n/).forEach((line) => {
+        const m = line.trim().match(/^(\d+)\s*(?:,|\t|\s+)\s*([0-9.]+)\s*([kKmMbB]?)$/);
+        if (!m) return;
+        const amount = Number(m[2]);
+        const suffix = m[3].toLowerCase();
+        const multiplier = suffix === "k" ? 1e3 : suffix === "m" ? 1e6 : suffix === "b" ? 1e9 : 1;
+        const value = amount * multiplier;
+        if (Number.isFinite(value) && value > 0) costs[Number(m[1])] = value;
+      });
+    }
+    return costs;
+  }
+
+  function currentBuildFromPage(equippedRank) {
+    const levels = {};
+    const body = document.querySelector("#items-body");
+    body?.querySelectorAll("input[data-rank]").forEach((input) => {
+      levels[input.dataset.rank] = Math.max(1, Math.min(500, Math.round(Number(input.value) || 1)));
+    });
+    const equippedInput = document.querySelector("#equipped-level");
+    if (equippedInput) levels[equippedRank] = Math.max(1, Math.min(500, Math.round(Number(equippedInput.value) || 1)));
+    return levels;
+  }
+
   function upgradeAction(rankName, levels, equippedRank, costs, formulas, useRawHoldingTotals) {
     const fromLevel = Number(levels[rankName] || 1);
     const toLevel = fromLevel + 1;
@@ -153,7 +166,6 @@
   function optimizeTarget(targetRank, targetLevel, equippedRank, costs, formulas, useRawHoldingTotals) {
     const levels = Object.fromEntries(ownedRanks(equippedRank).map((rank) => [rank.name, 1]));
     levels[targetRank] = targetLevel;
-
     const lowerRanks = ownedRanks(equippedRank).filter((rank) => rank.name !== targetRank);
     const upgrades = [];
     for (let safety = 0; safety < 5000; safety += 1) {
@@ -181,19 +193,25 @@
   }
 
   function buildIndependentRoute() {
-    const state = savedState();
-    const equippedRank = state.equippedRank || document.querySelector("#equipped-rank")?.value || "SS2";
-    const startLevel = Number(state.levels?.[equippedRank] || 1);
+    // Read the CURRENT controls directly from the page. This avoids routing with
+    // stale localStorage values when the user has just changed rank/level.
+    const select = document.querySelector("#equipped-rank");
+    const equippedRank = select?.value || savedState().equippedRank || "SS2";
+    const currentLevels = currentBuildFromPage(equippedRank);
+    const startLevel = Number(currentLevels[equippedRank] || 1);
+
+    const output = document.querySelector("#planner-output");
+    if (!output) return;
     if (startLevel >= 500) {
-      const output = document.querySelector("#planner-output");
-      if (output) output.innerHTML = `<div class="plan-summary"><h3>${equippedRank} is already at level 500</h3><p>There are no equipped levels left to route.</p></div>`;
+      output.innerHTML = `<div class="plan-summary"><h3>${equippedRank} is already at level 500</h3><p>There are no equipped levels left to route.</p></div>`;
       return;
     }
 
-    const costs = state.costs || {};
-    const formulas = { ...DEFAULT_FORMULAS, ...(state.formulas || {}) };
-    const useRawHoldingTotals = Boolean(state.options?.useRawHoldingTotals);
-    const currentLevels = { ...(state.levels || {}) };
+    const saved = savedState();
+    const costs = readCostTable();
+    const formulas = { ...DEFAULT_FORMULAS, ...(saved.formulas || {}) };
+    const rawToggle = document.querySelector("#use-raw-holding-totals");
+    const useRawHoldingTotals = rawToggle ? rawToggle.checked : Boolean(saved.options?.useRawHoldingTotals);
     const rows = [];
 
     for (let targetLevel = startLevel; targetLevel < 500; targetLevel += 1) {
@@ -205,30 +223,25 @@
       let prepCost = 0;
       for (const rank of ownedRanks(equippedRank)) {
         if (rank.name === equippedRank) continue;
-        const current = Number(currentLevels[rank.name] || 1);
         const optimal = Number(plan.levels[rank.name] || 1);
-        if (current === optimal) continue;
-        changes.push(`${rank.name} ${current}→${optimal}`);
-        if (optimal > current) {
-          prepCount += optimal - current;
-          for (let level = current + 1; level <= optimal; level += 1) {
-            const cost = costAt(costs, level);
-            if (cost) prepCost += cost;
-          }
+        if (optimal <= 1) continue;
+        changes.push(`${rank.name} 1→${optimal}`);
+        for (let level = 2; level <= optimal; level += 1) {
+          const cost = costAt(costs, level);
+          if (cost) prepCost += cost;
         }
+        prepCount += optimal - 1;
       }
 
       const changeText = changes.length ? changes.join(", ") : "no preparatory lower upgrades";
       rows.push(`<div class="route-row"><strong>Before ${equippedRank} ${targetLevel} → ${targetLevel + 1}</strong> — ${changeText} <span class="quiet">(${prepCount} prep upgrade${prepCount === 1 ? "" : "s"}, ${formatNumber(prepCost)})</span></div>`);
     }
 
-    const output = document.querySelector("#planner-output");
-    if (!output) return;
     if (!rows.length) {
-      output.innerHTML = `<div class="plan-summary"><h3>No route could be calculated</h3><p>The next equipped-item cost is not known.</p></div>`;
+      output.innerHTML = `<div class="plan-summary"><h3>No route could be calculated</h3><p>The next equipped-item cost is not known yet.</p></div>`;
       return;
     }
-    output.innerHTML = `<div class="plan-summary"><h3>Independent ${equippedRank} route</h3><p>Each equipped level is recalculated from scratch using the most efficient lower-item stopping levels for that specific target.</p><div class="route-list">${rows.join("")}</div></div>`;
+    output.innerHTML = `<div class="plan-summary"><h3>Independent ${equippedRank} route</h3><p>Each equipped level is recalculated independently from level 1 on the lower items, so a later target can legitimately call for lower holding-item levels than an earlier target.</p><div class="route-list">${rows.join("")}</div></div>`;
   }
 
   function install() {
