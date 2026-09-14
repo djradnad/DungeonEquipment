@@ -40,12 +40,12 @@
       <section class="card details-card" aria-labelledby="details-heading">
         <div class="section-heading"><div><p class="eyebrow">STAT FORMULAS</p><h2 id="details-heading">Formula reference</h2></div></div>
         <p class="help-text">These are the current stat formulas used by the planner. They are reference values only and are not editable here.</p>
-        <div class="formula-note"><p><strong>Base values at level 1:</strong> Equip D1 = <code>10.2%</code>; Holding 1 D1 = <code>1.01%</code>; Holding 2 S1 = <code>15.78125%</code>; Holding 3 SS1 = <code>6.3125%</code>.</p><p><strong>Per-level growth:</strong> Equip = <code>×1.02</code>; Holding stats = <code>×1.01</code>.</p><p><strong>Rank scaling:</strong> D–A use <code>5^tier × 1.5^(rank − 1)</code>; S uses <code>625 × 2^(rank − 1)</code>; SS starts at S4 × 2.5 and uses 2.5× per rank; SSS is SS4 × 12.5.</p><p>Holding stat 2 starts at S1 and holding stat 3 starts at SS1.</p></div>
+        <div class="formula-note"><p><strong>Base values at level 1:</strong> Equip D1 = <code>10.2%</code>; Holding 1 D1 = <code>1.01%</code>; Holding 2 S1 = <code>15.78125%</code>; Holding 3 SS1 = <code>6.3125%</code>.</p><p><strong>Per-level growth:</strong> Equip = <code>×1.02</code> per level; Holding stats = <code>×1.01</code> per level.</p><p><strong>Rank scaling:</strong> D–A use <code>5^tier × 1.5^(rank − 1)</code>; S uses <code>625 × 2^(rank − 1)</code>; SS starts at S4 × 2.5 and uses 2.5× per rank; SSS is SS4 × 12.5.</p><p>Holding stat 2 starts at S1 and holding stat 3 starts at SS1.</p></div>
       </section>
       <div hidden aria-hidden="true"><input id="use-staged-rounding" type="checkbox" /><textarea id="cost-data"></textarea><button id="apply-costs" type="button"></button><button id="restore-costs" type="button"></button><span id="cost-status"></span><input id="base-equip" type="number" /><input id="base-h1" type="number" /><input id="base-h2" type="number" /><input id="base-h3" type="number" /><input id="equip-growth" type="number" /><input id="holding-growth" type="number" /><button id="apply-formulas" type="button"></button><span id="formula-status"></span></div>
       <footer><span>UNOFFICIAL FAN TOOL</span> · runs entirely in your browser · <span>made for dungeon enjoyers</span></footer>
     </main>
     <script src="app.js?v=20260915"></script>
-    <script src="ui-fixes.js?v=20260915"></script>
+    <script src="ui-fixes.js?v=20260915b"></script>
   </body>
 </html>
