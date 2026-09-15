@@ -14,37 +14,21 @@
         <div class="section-heading">
           <div><p class="eyebrow">STEP ONE</p><h2 id="setup-heading">Pick your highest owned item</h2></div>
         </div>
-        <div class="setup-grid two-col">
+        <div class="setup-grid one-col">
           <label>Highest owned item
             <select id="highest-rank"></select>
             <small>Everything below it counts as owned.</small>
           </label>
-          <label>SSS level cap
-            <select id="max-level"></select>
-            <small id="max-level-hint">Level breaking applies to SSS only.</small>
-          </label>
 
         </div>
         <p class="quiet" id="item-count">—</p>
-        <p class="estimate-note" id="estimate-note" hidden>
-          <strong>Heads up:</strong> confirmed cost data only exists for levels 2–500. Above that the tool uses the
-          community formula <code>0.1 × L³ + L + 49.4</code> (where L is the level you upgrade from), which matches the
-          real table from 151–500 to within half a percent. Rows past 500 are marked with <span class="est-dot">~</span>
-          and are a projection, not confirmed game data.
-        </p>
       </section>
 
       <section class="card chart-card" aria-labelledby="chart-heading">
         <div class="section-heading">
           <div><p class="eyebrow">MAIN CHART</p><h2 id="chart-heading">Where every other item should be</h2></div>
-          <button type="button" class="button secondary" id="cancel-compute" hidden>Cancel</button>
         </div>
-        <p class="help-text">Read a row as: “when this item is at level N, every other item should be at these levels.” Only the page you are looking at gets calculated, so it stays responsive even at a 6500 cap.</p>
-
-        <div id="progress-wrap" class="progress-wrap" hidden>
-          <div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div>
-          <span id="progress-label" class="quiet">Starting…</span>
-        </div>
+        
 
         <div class="chart-tabs-row">
           <button type="button" class="button ghost chart-nav" id="chart-prev-item" aria-label="Previous item">&lsaquo;</button>
@@ -110,6 +94,6 @@
 
       <footer><span>UNOFFICIAL FAN TOOL</span> · runs entirely in your browser · <span>made for dungeon enjoyers</span></footer>
     </main>
-    <script src="app.js?v=20260915e"></script>
+    <script src="app.js?v=20260915f"></script>
   </body>
 </html>
