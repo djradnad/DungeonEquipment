@@ -9,43 +9,109 @@
   </head>
   <body>
     <main class="page-shell">
+
       <section class="card setup-card" aria-labelledby="setup-heading">
         <div class="section-heading">
-          <div><p class="eyebrow">CURRENT BUILD</p><h2 id="setup-heading">What do you own?</h2></div>
-          <div class="section-actions"><label class="micro-toggle"><input id="use-raw-holding-totals" type="checkbox" /><span>use raw holding totals</span></label><button type="button" class="button ghost" id="reset-levels">Reset all owned items to level 1</button></div>
+          <div><p class="eyebrow">STEP ONE</p><h2 id="setup-heading">Pick your highest owned item</h2></div>
         </div>
         <div class="setup-grid">
-          <label>Highest item / equipped item<select id="equipped-rank" aria-describedby="owned-help"></select><small id="owned-help">Every lower rank is included as owned.</small></label>
-          <label>Equipped item level<input id="equipped-level" type="number" min="1" max="500" value="1" inputmode="numeric" /><small>Items unlock at level 1.</small></label>
-          <div class="stat-readout" aria-live="polite"><span>Current damage multiplier</span><strong id="current-damage">—</strong><small id="equipped-stat">Equipped stat: —</small><small id="current-breakdown">—</small></div>
+          <label>Highest owned item
+            <select id="highest-rank"></select>
+            <small>Everything below it counts as owned.</small>
+          </label>
+          <label>Level cap
+            <select id="max-level"></select>
+            <small>Raise this to simulate max-level unlocks.</small>
+          </label>
+          <label>Cost growth above 500
+            <input id="cost-growth" type="number" step="0.0001" min="1.0001" />
+            <small>Per-level multiplier used for estimates.</small>
+          </label>
         </div>
-        <div class="sr-only" aria-hidden="true"><input id="show-raw-stats" type="checkbox" /></div>
+        <p class="quiet" id="item-count">—</p>
+        <p class="estimate-note" id="estimate-note" hidden>
+          <strong>Heads up:</strong> real cost data only exists for levels 2–500. Everything above 500 is
+          <em>estimated</em> by growing the level-500 cost by the multiplier above. Rows past 500 are marked with
+          <span class="est-dot">~</span> — treat those recommendations as a projection, not confirmed game data.
+        </p>
       </section>
-      <section class="card" aria-labelledby="items-heading">
-        <div class="section-heading items-heading"><div><p class="eyebrow">OWNED ITEMS</p><h2 id="items-heading">Set current item levels</h2></div><span class="quiet" id="item-count">—</span></div>
-        <p class="help-text">The highest item supplies its equip stat. Every owned item supplies its holding stats. Holding stats 1, 2, and 3 each sum separately, then their three multipliers are multiplied with the equip multiplier. Values update as you type.</p>
-        <div class="table-wrap"><table class="items-table"><thead><tr><th>Item</th><th>Level</th><th>Next cost</th><th>Holding stats at current level</th><th>Next-upgrade efficiency</th></tr></thead><tbody id="items-body"></tbody></table></div>
+
+      <section class="card chart-card" aria-labelledby="chart-heading">
+        <div class="section-heading">
+          <div><p class="eyebrow">MAIN CHART</p><h2 id="chart-heading">Where every other item should be</h2></div>
+          <button type="button" class="button secondary" id="cancel-compute" hidden>Cancel</button>
+        </div>
+        <p class="help-text">Read a row as: “when this item is at level N, every other item should be at these levels.” Only the page you are looking at gets calculated, so it stays responsive even at a 6500 cap.</p>
+
+        <div id="progress-wrap" class="progress-wrap" hidden>
+          <div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div>
+          <span id="progress-label" class="quiet">Starting…</span>
+        </div>
+
+        <div class="chart-tabs-row">
+          <button type="button" class="button ghost chart-nav" id="chart-prev-item" aria-label="Previous item">&lsaquo;</button>
+          <div id="chart-tabs" class="chart-tabs" role="tablist"></div>
+          <button type="button" class="button ghost chart-nav" id="chart-next-item" aria-label="Next item">&rsaquo;</button>
+        </div>
+        <p class="quiet" id="chart-phase-info">—</p>
+
+        <div class="window-bar">
+          <button type="button" class="button secondary" id="window-prev">&lsaquo; Previous 500</button>
+          <span class="window-label" id="window-label">—</span>
+          <button type="button" class="button secondary" id="window-next">Next 500 &rsaquo;</button>
+        </div>
+
+        <div class="table-wrap chart-table-wrap">
+          <table class="chart-table">
+            <thead id="chart-head"></thead>
+            <tbody id="chart-body"></tbody>
+          </table>
+        </div>
+        <p class="quiet" id="chart-status" aria-live="polite"></p>
       </section>
-      <section class="card results-card" aria-labelledby="next-heading">
-        <div class="section-heading"><div><p class="eyebrow">DECISION</p><h2 id="next-heading">Best next upgrade</h2></div><div class="button-row"><button type="button" class="button secondary" id="refresh-results">Recalculate</button><button type="button" class="button" id="apply-best">Apply best next upgrade</button></div></div>
+
+      <section class="card explorer-card" aria-labelledby="explorer-heading">
+        <div class="section-heading items-heading">
+          <div><p class="eyebrow">SANDBOX</p><h2 id="explorer-heading">Efficiency explorer</h2></div>
+          <div class="section-actions">
+            <label class="micro-toggle"><input id="show-raw-stats" type="checkbox" /><span>raw stats</span></label>
+            <label class="micro-toggle"><input id="use-raw-holding-totals" type="checkbox" /><span>raw totals</span></label>
+            <label class="micro-toggle"><input id="use-staged-rounding" type="checkbox" /><span>staged rounding</span></label>
+          </div>
+        </div>
+        <p class="help-text">Completely separate from the chart above. Set any levels you like and watch how cost, stat gain and efficiency interact.</p>
+
+        <div class="stat-readout explorer-readout" aria-live="polite">
+          <span>Total damage multiplier</span>
+          <strong id="explorer-damage">—</strong>
+          <small id="explorer-breakdown">—</small>
+        </div>
+
+        <div class="button-row explorer-actions">
+          <button type="button" class="button secondary" id="match-chart">Load levels from chart page</button>
+          <button type="button" class="button secondary" id="apply-best">Apply best upgrade</button>
+          <button type="button" class="button ghost" id="reset-levels">Reset all to 1</button>
+        </div>
+
+        <div class="table-wrap"><table class="items-table"><thead><tr><th>Item</th><th>Level</th><th>Next cost</th><th>Holding stats</th><th>Efficiency</th></tr></thead><tbody id="explorer-body"></tbody></table></div>
+
+        <h3 class="sub-heading">Best next upgrade</h3>
         <div id="best-upgrade" class="best-upgrade" aria-live="polite"></div>
-        <div class="table-wrap compact-table-wrap"><table class="ranking-table"><thead><tr><th>Rank</th><th>Upgrade</th><th>Damage gain</th><th>Cost</th><th>Gain per 1M cost</th></tr></thead><tbody id="ranking-body"></tbody></table></div>
+        <div class="table-wrap compact-table-wrap"><table class="ranking-table"><thead><tr><th>Item</th><th>Upgrade</th><th>Damage gain</th><th>Cost</th><th>Gain per 1M</th></tr></thead><tbody id="ranking-body"></tbody></table></div>
       </section>
-      <section class="card planner-card" aria-labelledby="planner-heading">
-        <div class="section-heading"><div><p class="eyebrow">BREAKPOINT PLANNER</p><h2 id="planner-heading">Levels worth buying before the target item</h2></div></div>
-        <p class="help-text">Each target level is evaluated independently. The planner recalculates the most efficient lower-item stopping levels for that specific equipped upgrade instead of carrying previous preparation levels forward.</p>
-        <div class="planner-controls"><button type="button" class="button secondary" id="plan-before-equipped">Plan before equipped item’s next level</button><button type="button" class="button secondary" id="build-equipped-route">Build equipped route through known costs</button><button type="button" class="button secondary" id="plan-holding-route">Plan holding-only route after level 500</button></div>
-        <div id="planner-output" class="planner-output" aria-live="polite"><p class="empty-state">Choose a planner action to see the recommended stopping levels.</p></div>
-      </section>
+
       <section class="card details-card" aria-labelledby="details-heading">
         <div class="section-heading"><div><p class="eyebrow">STAT FORMULAS</p><h2 id="details-heading">Formula reference</h2></div></div>
-        <p class="help-text">These are the current stat formulas used by the planner. They are reference values only and are not editable here.</p>
-        <div class="formula-note"><p><strong>Base values at level 1:</strong> Equip D1 = <code>10.2%</code>; Holding 1 D1 = <code>1.01%</code>; Holding 2 S1 = <code>15.78125%</code>; Holding 3 SS1 = <code>6.3125%</code>.</p><p><strong>Per-level growth:</strong> Equip = <code>×1.02</code> per level; Holding stats = <code>×1.01</code> per level.</p><p><strong>Rank scaling:</strong> D–A use <code>5^tier × 1.5^(rank − 1)</code>; S uses <code>625 × 2^(rank − 1)</code>; SS starts at S4 × 2.5 and uses 2.5× per rank; SSS is SS4 × 12.5.</p><p>Holding stat 2 starts at S1 and holding stat 3 starts at SS1.</p></div>
+        <div class="formula-note">
+          <p><strong>Base values at level 1:</strong> Equip D1 = <code>10.2%</code>; Holding 1 D1 = <code>1.01%</code>; Holding 2 S1 = <code>15.78125%</code>; Holding 3 SS1 = <code>6.3125%</code>.</p>
+          <p><strong>Per-level growth:</strong> Equip <code>×1.02</code>; Holding stats <code>×1.01</code>.</p>
+          <p><strong>Rank scaling:</strong> D–A use <code>5^tier × 1.5^(rank − 1)</code>; S uses <code>625 × 2^(rank − 1)</code>; SS is S4 × 2.5 then 2.5× per rank; SSS is SS4 × 12.5.</p>
+          <p>Holding stat 2 starts at S1; holding stat 3 starts at SS1.</p>
+        </div>
       </section>
-      <div hidden aria-hidden="true"><input id="use-staged-rounding" type="checkbox" /><textarea id="cost-data"></textarea><button id="apply-costs" type="button"></button><button id="restore-costs" type="button"></button><span id="cost-status"></span><input id="base-equip" type="number" /><input id="base-h1" type="number" /><input id="base-h2" type="number" /><input id="base-h3" type="number" /><input id="equip-growth" type="number" /><input id="holding-growth" type="number" /><button id="apply-formulas" type="button"></button><span id="formula-status"></span></div>
+
       <footer><span>UNOFFICIAL FAN TOOL</span> · runs entirely in your browser · <span>made for dungeon enjoyers</span></footer>
     </main>
-    <script src="app.js?v=20260915"></script>
-    <script src="ui-fixes.js?v=20260915b"></script>
+    <script src="app.js?v=20260915e"></script>
   </body>
 </html>
