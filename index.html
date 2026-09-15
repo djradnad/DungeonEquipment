@@ -14,25 +14,23 @@
         <div class="section-heading">
           <div><p class="eyebrow">STEP ONE</p><h2 id="setup-heading">Pick your highest owned item</h2></div>
         </div>
-        <div class="setup-grid">
+        <div class="setup-grid two-col">
           <label>Highest owned item
             <select id="highest-rank"></select>
             <small>Everything below it counts as owned.</small>
           </label>
-          <label>Level cap
+          <label>SSS level cap
             <select id="max-level"></select>
-            <small>Raise this to simulate max-level unlocks.</small>
+            <small id="max-level-hint">Level breaking applies to SSS only.</small>
           </label>
-          <label>Cost growth above 500
-            <input id="cost-growth" type="number" step="0.0001" min="1.0001" />
-            <small>Per-level multiplier used for estimates.</small>
-          </label>
+
         </div>
         <p class="quiet" id="item-count">—</p>
         <p class="estimate-note" id="estimate-note" hidden>
-          <strong>Heads up:</strong> real cost data only exists for levels 2–500. Everything above 500 is
-          <em>estimated</em> by growing the level-500 cost by the multiplier above. Rows past 500 are marked with
-          <span class="est-dot">~</span> — treat those recommendations as a projection, not confirmed game data.
+          <strong>Heads up:</strong> confirmed cost data only exists for levels 2–500. Above that the tool uses the
+          community formula <code>0.1 × L³ + L + 49.4</code> (where L is the level you upgrade from), which matches the
+          real table from 151–500 to within half a percent. Rows past 500 are marked with <span class="est-dot">~</span>
+          and are a projection, not confirmed game data.
         </p>
       </section>
 
@@ -93,7 +91,7 @@
           <button type="button" class="button ghost" id="reset-levels">Reset all to 1</button>
         </div>
 
-        <div class="table-wrap"><table class="items-table"><thead><tr><th>Item</th><th>Level</th><th>Next cost</th><th>Holding stats</th><th>Efficiency</th></tr></thead><tbody id="explorer-body"></tbody></table></div>
+        <div class="table-wrap"><table class="items-table"><thead><tr><th>Item</th><th>Level</th><th>Next cost</th><th>Holding stats</th><th>Damage gain</th></tr></thead><tbody id="explorer-body"></tbody></table></div>
 
         <h3 class="sub-heading">Best next upgrade</h3>
         <div id="best-upgrade" class="best-upgrade" aria-live="polite"></div>
