@@ -581,6 +581,7 @@ function loadState() {
     formulas: { ...DEFAULT_FORMULAS },
     explorerLevels: {},
     options: { showRawStats: false, useRawHoldingTotals: false, useStagedRounding: false },
+    chartOptions: { useRawHoldingTotals: false, useStagedRounding: false },
   };
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
@@ -591,6 +592,7 @@ function loadState() {
       formulas: { ...initial.formulas, ...(saved.formulas || {}) },
       explorerLevels: { ...initial.explorerLevels, ...(saved.explorerLevels || {}) },
       options: { ...initial.options, ...(saved.options || {}) },
+      chartOptions: { ...initial.chartOptions, ...(saved.chartOptions || {}) },
     };
   } catch { return initial; }
 }
@@ -607,7 +609,10 @@ const ui = {
   highestRank: document.querySelector("#highest-rank"),
   itemCount: document.querySelector("#item-count"),
 
-  chartTabs: document.querySelector("#chart-tabs"),
+  itemBar: document.querySelector("#item-bar"),
+  chartItemLabel: document.querySelector("#chart-item-label"),
+  chartRawTotals: document.querySelector("#chart-raw-totals"),
+  chartStagedRounding: document.querySelector("#chart-staged-rounding"),
   chartPrevItem: document.querySelector("#chart-prev-item"),
   chartNextItem: document.querySelector("#chart-next-item"),
   chartPhaseInfo: document.querySelector("#chart-phase-info"),
@@ -666,30 +671,46 @@ function roundHalfDown(value, decimals = 2) {
 function stagedRoundHalfDown(value, decimals = 2) {
   return Math.sign(value) * roundHalfDown(roundHalfDown(roundHalfDown(Math.abs(value), 4), 3), decimals);
 }
+/* Game-style suffixes: K, M, B, T, then lowercase letters.
+   0 -> a, 25 -> z, 26 -> aa, 27 -> ab, ... (bijective base-26). */
 function letterSuffix(index) {
   if (index < 0) return "";
-  if (index < 26) return String.fromCharCode(97 + index);
-  const letter = String.fromCharCode(97 + ((index - 26) % 26));
-  return letter.repeat(Math.floor((index - 26) / 26) + 2);
+  let n = index + 1;
+  let out = "";
+  while (n > 0) {
+    n -= 1;
+    out = String.fromCharCode(97 + (n % 26)) + out;
+    n = Math.floor(n / 26);
+  }
+  return out;
+}
+
+/* unitIndex 1 = K (1e3), 2 = M, 3 = B, 4 = T, 5 = a (1e15), 6 = b, ... */
+function unitSuffix(unitIndex) {
+  const fixed = ["", "K", "M", "B", "T"];
+  return unitIndex <= 4 ? fixed[unitIndex] : letterSuffix(unitIndex - 5);
+}
+
+/* Picks the display unit for a magnitude, guarding against log10 edge cases. */
+function unitFor(absolute) {
+  if (!(absolute >= 1000)) return { divisor: 1, suffix: "", unitIndex: 0 };
+  let unitIndex = Math.max(1, Math.floor(Math.log10(absolute) / 3));
+  let divisor = 10 ** (unitIndex * 3);
+  if (absolute / divisor >= 1000) { unitIndex += 1; divisor = 10 ** (unitIndex * 3); }
+  return { divisor, suffix: unitSuffix(unitIndex), unitIndex };
 }
 function gameStatValue(value, useStaged) {
   const absolute = Math.abs(value);
   if (absolute === 0) return { display: 0, numeric: 0, suffix: "" };
-  let unitIndex, divisor, suffix;
-  if (absolute >= 1e15) {
-    unitIndex = Math.floor(Math.log10(absolute) / 3) - 5;
-    divisor = 10 ** ((unitIndex + 5) * 3);
-    suffix = unitIndex === 0 ? "T" : unitIndex === 1 ? "a" : letterSuffix(unitIndex - 2);
-  } else if (absolute >= 1e12) { divisor = 1e12; suffix = "T"; }
-  else if (absolute >= 1e9) { divisor = 1e9; suffix = "B"; }
-  else if (absolute >= 1e6) { divisor = 1e6; suffix = "M"; }
-  else if (absolute >= 1e3) { divisor = 1e3; suffix = "K"; }
-  else { divisor = 1; suffix = ""; }
+  let { divisor, suffix, unitIndex } = unitFor(absolute);
   const roundingFn = useStaged ? stagedRoundHalfDown : roundHalfDown;
   let display = roundingFn(value / divisor);
-  if (Math.abs(display) >= 1000 && divisor > 1) {
-    divisor = divisor / 1000;
-    suffix = divisor === 1e12 ? "T" : divisor === 1e9 ? "B" : divisor === 1e6 ? "M" : divisor === 1e3 ? "K" : "";
+  // Rounding can push the mantissa to exactly 1000 (e.g. 999.996 -> 1000.00);
+  // that belongs in the NEXT unit up, displayed as 1.00.
+  if (Math.abs(display) >= 1000) {
+    unitIndex += 1;
+    divisor = 10 ** (unitIndex * 3);
+    suffix = unitSuffix(unitIndex);
     display = roundingFn(value / divisor);
   }
   return { display, numeric: display * divisor, suffix };
@@ -724,11 +745,17 @@ function contribution(rankName, level) {
   const hit = contributionCache.get(key);
   if (hit) return hit;
   const stats = itemStats(rankName, level);
+  // "raw totals" skips the game's 2-decimal rounding entirely, which removes
+  // the quantisation bumps caused by a stat's increment straddling a rounding
+  // step. The level-151 cost jump is a real game mechanic and is unaffected.
+  const raw = state.chartOptions.useRawHoldingTotals;
+  const staged = state.chartOptions.useStagedRounding;
+  const round = (v) => (raw ? v : gameStatValue(v, staged).numeric);
   const value = {
     equip: stats.equip,
-    h1: gameStatValue(stats.h1, false).numeric,
-    h2: gameStatValue(stats.h2, false).numeric,
-    h3: gameStatValue(stats.h3, false).numeric,
+    h1: round(stats.h1),
+    h2: round(stats.h2),
+    h3: round(stats.h3),
   };
   contributionCache.set(key, value);
   return value;
@@ -804,7 +831,7 @@ function solveAt(targetRank, targetLevel, names) {
 let chart = null;
 let activeRun = null;
 
-function chartSignature() { return JSON.stringify({ rank: state.highestRank, max: state.maxLevel, formulas: state.formulas }); }
+function chartSignature() { return JSON.stringify({ rank: state.highestRank, max: state.maxLevel, formulas: state.formulas, chartOptions: state.chartOptions }); }
 
 function buildChart() {
   const names = ownedNames();
@@ -864,7 +891,7 @@ async function computeWindow(phase, windowIndex, run) {
 }
 
 function setComputing(isComputing) {
-  ui.chartTabs.classList.toggle("is-busy", isComputing);
+  ui.itemBar.classList.toggle("is-busy", isComputing);
 }
 
 async function showWindow(phaseIndex, windowIndex) {
@@ -890,11 +917,12 @@ async function showWindow(phaseIndex, windowIndex) {
   renderChart(rows);
 }
 
-function renderChartTabs() {
-  ui.chartTabs.innerHTML = chart.phases.map((phase, index) => {
-    const cap = capFor(phase.rank);
-    return `<button type="button" class="chart-tab${index === chart.activePhase ? " active" : ""}" data-phase="${index}">${phase.rank}<span class="chart-tab-sub">${phase.startLevel}\u2013${cap}</span></button>`;
-  }).join("");
+function renderItemBar() {
+  const phase = chart.phases[chart.activePhase];
+  const cap = capFor(phase.rank);
+  ui.chartItemLabel.innerHTML = `<strong>${phase.rank}</strong><span class="item-bar-range">levels ${phase.startLevel}\u2013${cap}</span>`;
+  ui.chartPrevItem.disabled = chart.activePhase === 0;
+  ui.chartNextItem.disabled = chart.activePhase >= chart.phases.length - 1;
 }
 
 function renderChart(rows) {
@@ -903,10 +931,10 @@ function renderChart(rows) {
   const maxed = chart.order.slice(0, chart.activePhase);
   const { start, end, cap } = windowBounds(phase);
 
-  renderChartTabs();
+  renderItemBar();
   ui.chartPhaseInfo.innerHTML = maxed.length
-    ? `Assumes already maxed: <strong>${maxed.join(", ")}</strong>`
-    : "This is your highest owned item. Nothing is maxed yet.";
+    ? `This page assumes you have already taken <strong>${maxed.join(", ")}</strong> to level ${BASE_MAX_LEVEL}.`
+    : "This is your highest owned item, so nothing is assumed maxed yet.";
 
   ui.windowLabel.textContent = `Levels ${start}\u2013${end}  (page ${chart.activeWindow + 1} of ${windowCount(phase)})`;
   ui.windowPrev.disabled = chart.activeWindow === 0;
@@ -948,18 +976,14 @@ function renderChart(rows) {
    FORMATTING
    ------------------------------------------------------------ */
 
+/* Uses the same K/M/B/T + a,b,c... scale the game shows. */
 function formatNumber(value, digits = 3) {
   if (!Number.isFinite(value)) return "\u2014";
   const absolute = Math.abs(value);
   if (absolute === 0) return "0";
-  if (absolute >= 1e36) return value.toExponential(2).replace("e+", "e");
-  const suffixes = [
-    [1e33, "Dc"], [1e30, "No"], [1e27, "Oc"], [1e24, "Sp"], [1e21, "Sx"],
-    [1e18, "Qi"], [1e15, "Qa"], [1e12, "T"], [1e9, "B"], [1e6, "M"], [1e3, "k"],
-  ];
-  const found = suffixes.find(([threshold]) => absolute >= threshold);
-  if (found) return `${(value / found[0]).toLocaleString(undefined, { maximumSignificantDigits: digits })}${found[1]}`;
-  return value.toLocaleString(undefined, { maximumSignificantDigits: digits, maximumFractionDigits: 3 });
+  const { divisor, suffix } = unitFor(absolute);
+  if (divisor === 1) return value.toLocaleString(undefined, { maximumSignificantDigits: digits, maximumFractionDigits: 3 });
+  return `${(value / divisor).toLocaleString(undefined, { maximumSignificantDigits: digits })}${suffix}`;
 }
 function formatCost(value) { return formatNumber(value, 4); }
 function formatPercent(value) { return Number.isFinite(value) ? `${formatNumber(value, 4)}%` : "\u2014"; }
@@ -1093,12 +1117,16 @@ function attachEvents() {
     refreshAll();
   });
 
-  ui.chartTabs.addEventListener("click", (event) => {
-    const tab = event.target.closest(".chart-tab");
-    if (tab) showWindow(Number(tab.dataset.phase), 0);
-  });
   ui.chartPrevItem.addEventListener("click", () => showWindow(chart.activePhase - 1, 0));
   ui.chartNextItem.addEventListener("click", () => showWindow(chart.activePhase + 1, 0));
+  ui.chartRawTotals.addEventListener("change", () => {
+    state.chartOptions.useRawHoldingTotals = ui.chartRawTotals.checked;
+    saveState(); refreshAll();
+  });
+  ui.chartStagedRounding.addEventListener("change", () => {
+    state.chartOptions.useStagedRounding = ui.chartStagedRounding.checked;
+    saveState(); refreshAll();
+  });
   ui.windowPrev.addEventListener("click", () => showWindow(chart.activePhase, chart.activeWindow - 1));
   ui.windowNext.addEventListener("click", () => showWindow(chart.activePhase, chart.activeWindow + 1));
 
@@ -1137,6 +1165,8 @@ function initialize() {
   if (rankIndex(state.highestRank) < 0) state.highestRank = "SS2";
   state.maxLevel = BASE_MAX_LEVEL; // level breaking disabled for now
   renderRankOptions();
+  ui.chartRawTotals.checked = state.chartOptions.useRawHoldingTotals;
+  ui.chartStagedRounding.checked = state.chartOptions.useStagedRounding;
   ui.showRawStats.checked = state.options.showRawStats;
   ui.useRawHoldingTotals.checked = state.options.useRawHoldingTotals;
   ui.useStagedRounding.checked = state.options.useStagedRounding;
