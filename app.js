@@ -2,26 +2,17 @@
 
 /* ============================================================
    DUNGEON ODYSSEY - UPGRADE PATHFINDER
-   ------------------------------------------------------------
-   Two independent tools share one ownership setting:
 
-   SECTION A "Optimal path" - the main chart. Pick your highest
-   owned item, then scroll. It shows, for every level of that
-   item, what level each lower item should be at. Computed
-   lazily in 500-level windows so it never locks up the page.
+   MAIN CHART - pick your highest owned item and scroll. Each row
+   answers "when this item is at level N, what level should every
+   other item be at?" Every row is solved INDEPENDENTLY from
+   level 1, so recommended levels can go DOWN as the main item
+   climbs. That is correct and intended: items can be down-levelled.
 
-   SECTION B "Efficiency explorer" - a manual sandbox. Set any
-   levels you like and inspect the cost/gain maths directly.
-   Deliberately NOT linked to section A.
+   EFFICIENCY EXPLORER - a separate manual sandbox.
    ============================================================ */
 
-/* ------------------------------------------------------------
-   COST DATA
-   Real in-game costs are known for levels 2-500 only. Anything
-   above 500 is ESTIMATED by geometric extrapolation - see
-   nextCost(). The tail of the real table grows at a very steady
-   ~1.0062x per level, which is where the default comes from.
-   ------------------------------------------------------------ */
+/* Real observed upgrade costs, levels 2-500. */
 const DEFAULT_COST_DATA = `
 2,270
 3,419
@@ -524,7 +515,7 @@ const DEFAULT_COST_DATA = `
 500,12430000
 `;
 
-const STORAGE_KEY = "upgrade-pathfinder-v2";
+const STORAGE_KEY = "upgrade-pathfinder-v3";
 const TIER_ORDER = ["D", "C", "B", "A", "S", "SS"];
 const RANKS = [
   ...["D", "C", "B", "A", "S", "SS"].flatMap((tier) => [1, 2, 3, 4].map((rank) => ({ name: `${tier}${rank}`, tier, rank }))),
@@ -540,14 +531,14 @@ const DEFAULT_FORMULAS = {
   holdingGrowth: 1.01,
 };
 
-const KNOWN_COST_MAX = 500;        // last level with real, observed cost data
-const BASE_MAX_LEVEL = 500;        // cap before any max-level unlocks
-const MAX_LEVEL_STEP = 100;        // each unlock raises the cap by this much
-const ABSOLUTE_MAX_LEVEL = 6500;   // believed true ceiling
-const DEFAULT_COST_GROWTH = 1.0062; // per-level growth used above level 500
-const WINDOW_SIZE = 500;           // levels shown per page of the main chart
-const CHUNK_SIZE = 20;             // target-levels computed before yielding to the browser
-const COMPUTE_BUDGET_MS = 60000;   // absolute ceiling on one compute run
+const KNOWN_COST_MAX = 500;      // last level with real observed cost data
+const BASE_MAX_LEVEL = 500;      // standard cap for every item
+const MAX_LEVEL_STEP = 100;      // each level-break unlock adds this much
+const ABSOLUTE_MAX_LEVEL = 6500; // believed true ceiling
+const BREAKABLE_RANK = "SSS";    // ONLY this rank can exceed level 500
+const WINDOW_SIZE = 500;         // levels shown per page
+const CHUNK_ROWS = 40;           // rows solved before yielding to the browser
+const COMPUTE_BUDGET_MS = 30000;
 
 /* ------------------------------------------------------------
    STATE
@@ -555,6 +546,14 @@ const COMPUTE_BUDGET_MS = 60000;   // absolute ceiling on one compute run
 
 function rankIndex(rankName) { return RANKS.findIndex((rank) => rank.name === rankName); }
 function ownedRanks() { return RANKS.slice(0, rankIndex(state.highestRank) + 1); }
+function ownedNames() { return ownedRanks().map((rank) => rank.name); }
+function ownsBreakable() { return rankIndex(state.highestRank) >= rankIndex(BREAKABLE_RANK); }
+
+/* Only SSS can be pushed past 500. Everything else is hard-capped. */
+function capFor(rankName) {
+  if (rankName !== BREAKABLE_RANK) return BASE_MAX_LEVEL;
+  return ownsBreakable() ? state.maxLevel : BASE_MAX_LEVEL;
+}
 
 function parseCostData(text) {
   const costs = {};
@@ -574,7 +573,6 @@ function loadState() {
   const initial = {
     highestRank: "SS2",
     maxLevel: BASE_MAX_LEVEL,
-    costGrowth: DEFAULT_COST_GROWTH,
     costs: parseCostData(DEFAULT_COST_DATA),
     formulas: { ...DEFAULT_FORMULAS },
     explorerLevels: {},
@@ -584,8 +582,7 @@ function loadState() {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
     if (!saved || typeof saved !== "object") return initial;
     return {
-      ...initial,
-      ...saved,
+      ...initial, ...saved,
       costs: { ...initial.costs, ...(saved.costs || {}) },
       formulas: { ...initial.formulas, ...(saved.formulas || {}) },
       explorerLevels: { ...initial.explorerLevels, ...(saved.explorerLevels || {}) },
@@ -595,7 +592,7 @@ function loadState() {
 }
 
 let state = loadState();
-function saveState() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* storage full or blocked - not fatal */ } }
+function saveState() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* non-fatal */ } }
 function clamp(value, minimum, maximum) { return Math.min(maximum, Math.max(minimum, value)); }
 
 /* ------------------------------------------------------------
@@ -605,7 +602,7 @@ function clamp(value, minimum, maximum) { return Math.min(maximum, Math.max(mini
 const ui = {
   highestRank: document.querySelector("#highest-rank"),
   maxLevel: document.querySelector("#max-level"),
-  costGrowth: document.querySelector("#cost-growth"),
+  maxLevelHint: document.querySelector("#max-level-hint"),
   itemCount: document.querySelector("#item-count"),
   estimateNote: document.querySelector("#estimate-note"),
 
@@ -672,15 +669,12 @@ function roundHalfDown(value, decimals = 2) {
 function stagedRoundHalfDown(value, decimals = 2) {
   return Math.sign(value) * roundHalfDown(roundHalfDown(roundHalfDown(Math.abs(value), 4), 3), decimals);
 }
-
-// Game-style suffixes: K/M/B/T capitalised, then a, b, c ... z, aa, bb ...
 function letterSuffix(index) {
   if (index < 0) return "";
   if (index < 26) return String.fromCharCode(97 + index);
   const letter = String.fromCharCode(97 + ((index - 26) % 26));
   return letter.repeat(Math.floor((index - 26) / 26) + 2);
 }
-
 function gameStatValue(value, useStaged) {
   const absolute = Math.abs(value);
   if (absolute === 0) return { display: 0, numeric: 0, suffix: "" };
@@ -704,34 +698,32 @@ function gameStatValue(value, useStaged) {
   return { display, numeric: display * divisor, suffix };
 }
 
-/* Cost lookup. Levels 2..500 are real observed data. Above 500 the value is
-   ESTIMATED by geometric growth from the level-500 cost. */
+/* Upgrade cost to REACH `level`.
+   Levels 2-500 use the real observed table. Above 500 the confirmed
+   community formula is used: cost = 0.1*L^3 + L + 49.4, where L is the
+   level you are upgrading FROM. It reproduces the real table from 151
+   to 500 to within half a percent. */
 function nextCost(level) {
   if (level < 2) return null;
-  if (level > state.maxLevel) return null;
   if (level <= KNOWN_COST_MAX) {
     const cost = Number(state.costs[level]);
     return Number.isFinite(cost) && cost > 0 ? cost : null;
   }
-  const anchor = Number(state.costs[KNOWN_COST_MAX]);
-  if (!Number.isFinite(anchor) || anchor <= 0) return null;
-  const growth = Number(state.costGrowth);
-  if (!Number.isFinite(growth) || growth <= 1) return null;
-  const estimated = anchor * growth ** (level - KNOWN_COST_MAX);
-  return Number.isFinite(estimated) && estimated > 0 ? estimated : null;
+  const from = level - 1;
+  const cost = 0.1 * from ** 3 + from + 49.4;
+  return Number.isFinite(cost) && cost > 0 ? cost : null;
 }
 function isEstimatedLevel(level) { return level > KNOWN_COST_MAX; }
 
 /* ------------------------------------------------------------
-   CHART ENGINE (section A)
-   Uses true in-game rounding always, so the chart never shifts
-   because of a display toggle in section B.
+   SOLVER
+   Chart maths always uses true in-game rounding so the chart never
+   shifts because of a display toggle in the explorer.
    ------------------------------------------------------------ */
 
 const contributionCache = new Map();
-function cacheKey(rankName, level) { return rankName + "|" + level; }
-function itemContribution(rankName, level) {
-  const key = cacheKey(rankName, level);
+function contribution(rankName, level) {
+  const key = rankName + "|" + level;
   const hit = contributionCache.get(key);
   if (hit) return hit;
   const stats = itemStats(rankName, level);
@@ -744,165 +736,212 @@ function itemContribution(rankName, level) {
   contributionCache.set(key, value);
   return value;
 }
-function clearComputeCaches() { contributionCache.clear(); }
 
-function chartTotal(levels, owned, highestRank) {
+/* Solves the optimal level of every item BELOW `targetRank`, for the moment
+   the target sits at `targetLevel`. Items above the target are pinned at
+   their own caps. Always starts from level 1, so the answer is the true
+   optimum for this level rather than an accumulation of earlier decisions -
+   which is what lets recommended levels legitimately go down. */
+function solveAt(targetRank, targetLevel, names) {
+  const targetPosition = names.indexOf(targetRank);
+  const higher = names.slice(targetPosition + 1);
+  const lower = names.slice(0, targetPosition);
+  const equipRank = names[names.length - 1];
+
+  const levels = {};
+  higher.forEach((name) => { levels[name] = capFor(name); });
+  levels[targetRank] = targetLevel;
+  lower.forEach((name) => { levels[name] = 1; });
+
   let h1 = 0, h2 = 0, h3 = 0;
-  for (let i = 0; i < owned.length; i += 1) {
-    const contribution = itemContribution(owned[i].name, levels[owned[i].name]);
-    h1 += contribution.h1; h2 += contribution.h2; h3 += contribution.h3;
+  for (let i = 0; i < names.length; i += 1) {
+    const c = contribution(names[i], levels[names[i]]);
+    h1 += c.h1; h2 += c.h2; h3 += c.h3;
   }
-  const equip = itemContribution(highestRank, levels[highestRank]).equip;
-  return (1 + equip / 100) * (1 + h1 / 100) * (1 + h2 / 100) * (1 + h3 / 100);
-}
 
-function chartEfficiency(rankName, levels, owned, highestRank, baseTotal) {
-  const toLevel = levels[rankName] + 1;
-  const cost = nextCost(toLevel);
-  if (!cost) return null;
-  const previous = levels[rankName];
-  levels[rankName] = toLevel;
-  const after = chartTotal(levels, owned, highestRank);
-  levels[rankName] = previous;
-  const percentGain = ((after - baseTotal) / baseTotal) * 100;
-  return { rank: rankName, cost, percentGain, efficiency: percentGain / cost };
-}
+  for (let guard = 0; guard < 100000; guard += 1) {
+    const equipLevel = levels[equipRank];
+    const equipBase = contribution(equipRank, equipLevel).equip;
+    const base = (1 + equipBase / 100) * (1 + h1 / 100) * (1 + h2 / 100) * (1 + h3 / 100);
 
-/* Buys every lower-item upgrade that beats the target's own next level,
-   repeatedly, until the target itself is the best buy. Mutates `levels`. */
-function prepareForTarget(levels, targetRank, owned, highestRank) {
-  for (let safety = 0; safety < 20000; safety += 1) {
-    const baseTotal = chartTotal(levels, owned, highestRank);
-    const target = chartEfficiency(targetRank, levels, owned, highestRank, baseTotal);
-    if (!target) return false;
-    let best = null;
-    for (let i = 0; i < owned.length; i += 1) {
-      const name = owned[i].name;
-      if (name === targetRank) continue;
-      const action = chartEfficiency(name, levels, owned, highestRank, baseTotal);
+    const evaluate = (name) => {
+      const from = levels[name];
+      const to = from + 1;
+      if (to > capFor(name)) return null;
+      const cost = nextCost(to);
+      if (!cost) return null;
+      const a = contribution(name, from);
+      const b = contribution(name, to);
+      const equipNew = name === equipRank ? contribution(name, to).equip : equipBase;
+      const after = (1 + equipNew / 100) * (1 + (h1 - a.h1 + b.h1) / 100) * (1 + (h2 - a.h2 + b.h2) / 100) * (1 + (h3 - a.h3 + b.h3) / 100);
+      const percentGain = (after / base - 1) * 100;
+      return { percentGain, cost, efficiency: percentGain / cost };
+    };
+
+    const targetAction = evaluate(targetRank);
+    if (!targetAction) break;
+
+    let best = null, bestName = null;
+    for (let i = 0; i < lower.length; i += 1) {
+      const name = lower[i];
+      const action = evaluate(name);
       if (!action) continue;
-      if (!best || action.efficiency > best.efficiency || (action.efficiency === best.efficiency && rankIndex(name) > rankIndex(best.rank))) best = action;
+      if (!best || action.efficiency > best.efficiency || (action.efficiency === best.efficiency && rankIndex(name) > rankIndex(bestName))) {
+        best = action; bestName = name;
+      }
     }
-    if (!best || best.efficiency <= target.efficiency * (1 + 1e-12)) return true;
-    levels[best.rank] += 1;
+    if (!best || best.efficiency <= targetAction.efficiency * (1 + 1e-12)) break;
+
+    const before = contribution(bestName, levels[bestName]);
+    levels[bestName] += 1;
+    const after = contribution(bestName, levels[bestName]);
+    h1 += after.h1 - before.h1; h2 += after.h2 - before.h2; h3 += after.h3 - before.h3;
   }
-  return true;
+  return levels;
 }
 
-/* The chart is a sequence of phases: highest item first, then the next
-   highest, and so on. Each phase runs that item from wherever it stands up
-   to the cap. Computation is strictly forward-only, so we advance a single
-   running cursor and cache rows as we go. */
+/* ------------------------------------------------------------
+   CHART
+   ------------------------------------------------------------ */
+
 let chart = null;
 let activeRun = null;
 
-function resetChart() {
-  const owned = ownedRanks();
-  const levels = {};
-  owned.forEach((rank) => { levels[rank.name] = 1; });
-  chart = {
-    signature: chartSignature(),
-    order: owned.slice().reverse().map((rank) => rank.name),
-    levels,
-    phases: owned.slice().reverse().map((rank, index) => ({
-      rank: rank.name,
-      startLevel: index === 0 ? 1 : null,
-      rows: index === 0 ? [{ level: 1, levels: { ...levels } }] : [],
-      complete: false,
-    })),
-    cursor: 0,
-    activePhase: 0,
-    activeWindow: 0,
-    exhausted: false,
-  };
-  clearComputeCaches();
+function chartSignature() { return JSON.stringify({ rank: state.highestRank, max: state.maxLevel, formulas: state.formulas }); }
+
+function buildChart() {
+  const names = ownedNames();
+  const order = names.slice().reverse();
+  contributionCache.clear();
+
+  // Each phase targets one item, working from the highest downwards. A phase
+  // starts wherever the previous phase left that item standing.
+  const phases = order.map((name) => ({ rank: name, startLevel: null, windows: new Map(), complete: false }));
+  phases[0].startLevel = 1;
+  for (let i = 1; i < phases.length; i += 1) {
+    const previous = phases[i - 1];
+    const previousCap = capFor(previous.rank);
+    const settled = solveAt(previous.rank, Math.max(1, previousCap - 1), names);
+    phases[i].startLevel = settled[phases[i].rank] || 1;
+  }
+
+  chart = { signature: chartSignature(), names, order, phases, activePhase: 0, activeWindow: 0 };
 }
-function chartSignature() {
-  return JSON.stringify({ rank: state.highestRank, max: state.maxLevel, growth: state.costGrowth, formulas: state.formulas });
+function ensureChart() { if (!chart || chart.signature !== chartSignature()) buildChart(); }
+
+function windowBounds(phase) {
+  const cap = capFor(phase.rank);
+  const start = phase.startLevel + chart.activeWindow * WINDOW_SIZE;
+  return { start, end: Math.min(cap, start + WINDOW_SIZE - 1), cap };
 }
-function ensureChartFresh() {
-  if (!chart || chart.signature !== chartSignature()) resetChart();
+function windowCount(phase) {
+  const cap = capFor(phase.rank);
+  return Math.max(1, Math.ceil((cap - phase.startLevel + 1) / WINDOW_SIZE));
 }
 
 function yieldToBrowser() { return new Promise((resolve) => setTimeout(resolve, 0)); }
 
-/* Advances computation until `phaseIndex` has rows covering `throughLevel`
-   (or is finished). Returns when done or cancelled. */
-async function computeThrough(phaseIndex, throughLevel, run) {
-  const owned = ownedRanks();
-  const highestRank = state.highestRank;
+async function computeWindow(phase, windowIndex, run) {
+  const key = windowIndex;
+  if (phase.windows.has(key)) return phase.windows.get(key);
+  const { start, end, cap } = windowBounds(phase);
   const deadline = Date.now() + COMPUTE_BUDGET_MS;
+  const rows = [];
   let sinceYield = 0;
 
-  while (chart.cursor <= phaseIndex) {
-    if (run.cancelled || Date.now() > deadline) return;
-    const phase = chart.phases[chart.cursor];
-
-    if (phase.startLevel === null) {
-      phase.startLevel = chart.levels[phase.rank];
-      phase.rows.push({ level: phase.startLevel, levels: { ...chart.levels } });
+  for (let level = start; level <= end; level += 1) {
+    if (run.cancelled || Date.now() > deadline) return null;
+    // At the cap the item has no next upgrade to save for, so the correct
+    // holding levels are the ones in place when that last upgrade was bought.
+    const solveLevel = level >= cap ? Math.max(1, cap - 1) : level;
+    rows.push({ level, levels: solveAt(phase.rank, solveLevel, chart.names) });
+    sinceYield += 1;
+    if (sinceYield >= CHUNK_ROWS) {
+      sinceYield = 0;
+      const done = level - start + 1;
+      ui.progressLabel.textContent = `${phase.rank}: solving level ${level} of ${end}`;
+      ui.progressBar.style.width = `${Math.round((done / (end - start + 1)) * 100)}%`;
+      await yieldToBrowser();
     }
-
-    const needLevel = chart.cursor < phaseIndex ? state.maxLevel : throughLevel;
-
-    while (chart.levels[phase.rank] < Math.min(needLevel, state.maxLevel)) {
-      if (run.cancelled || Date.now() > deadline) return;
-      const ok = prepareForTarget(chart.levels, phase.rank, owned, highestRank);
-      const canUpgrade = ok && nextCost(chart.levels[phase.rank] + 1) !== null;
-      if (!canUpgrade) { chart.exhausted = true; phase.complete = true; break; }
-      chart.levels[phase.rank] += 1;
-      phase.rows.push({ level: chart.levels[phase.rank], levels: { ...chart.levels } });
-      sinceYield += 1;
-      if (sinceYield >= CHUNK_SIZE) {
-        sinceYield = 0;
-        reportProgress(phase.rank, chart.levels[phase.rank], chart.cursor, chart.phases.length);
-        await yieldToBrowser();
-      }
-    }
-
-    if (chart.levels[phase.rank] >= state.maxLevel) phase.complete = true;
-    if (chart.cursor === phaseIndex && !phase.complete) return; // reached requested window
-    if (!phase.complete) return;
-    chart.cursor += 1;
-    if (chart.cursor >= chart.phases.length) return;
   }
+  phase.windows.set(key, rows);
+  return rows;
 }
 
-function reportProgress(rankName, level, phaseIndex, totalPhases) {
-  ui.progressLabel.textContent = `${rankName} - level ${level} of ${state.maxLevel} (item ${phaseIndex + 1} of ${totalPhases})`;
-  const fraction = (phaseIndex + level / state.maxLevel) / totalPhases;
-  ui.progressBar.style.width = `${Math.min(100, Math.round(fraction * 100))}%`;
-}
 function setComputing(isComputing) {
   ui.progressWrap.hidden = !isComputing;
   ui.cancelCompute.hidden = !isComputing;
   ui.chartTabs.classList.toggle("is-busy", isComputing);
 }
 
-/* Requests a view. Computes only as far as that window needs. */
-async function showPhaseWindow(phaseIndex, windowIndex) {
-  ensureChartFresh();
-  chart.activePhase = phaseIndex;
-  chart.activeWindow = Math.max(0, windowIndex);
+async function showWindow(phaseIndex, windowIndex) {
+  ensureChart();
+  chart.activePhase = clamp(phaseIndex, 0, chart.phases.length - 1);
+  const phase = chart.phases[chart.activePhase];
+  chart.activeWindow = clamp(windowIndex, 0, windowCount(phase) - 1);
 
   if (activeRun) activeRun.cancelled = true;
   const run = { cancelled: false };
   activeRun = run;
 
-  const phase = chart.phases[phaseIndex];
-  const startLevel = phase.startLevel !== null ? phase.startLevel : 1;
-  const throughLevel = Math.min(state.maxLevel, startLevel + (chart.activeWindow + 1) * WINDOW_SIZE);
-
-  const needsWork = chart.cursor < phaseIndex || (!phase.complete && (phase.rows.length === 0 || phase.rows[phase.rows.length - 1].level < throughLevel));
-  if (needsWork) {
+  const cached = phase.windows.has(chart.activeWindow);
+  if (!cached) {
     setComputing(true);
-    ui.chartStatus.textContent = "Calculating this section...";
+    ui.chartStatus.textContent = "";
     await yieldToBrowser();
-    await computeThrough(phaseIndex, throughLevel, run);
-    setComputing(false);
   }
+  const rows = await computeWindow(phase, chart.activeWindow, run);
+  setComputing(false);
   if (run.cancelled) return;
-  renderChart();
+  if (rows === null) { ui.chartStatus.textContent = "Calculation stopped early."; return; }
+  renderChart(rows);
+}
+
+function renderChartTabs() {
+  ui.chartTabs.innerHTML = chart.phases.map((phase, index) => {
+    const cap = capFor(phase.rank);
+    return `<button type="button" class="chart-tab${index === chart.activePhase ? " active" : ""}" data-phase="${index}">${phase.rank}<span class="chart-tab-sub">${phase.startLevel}\u2013${cap}</span></button>`;
+  }).join("");
+}
+
+function renderChart(rows) {
+  const phase = chart.phases[chart.activePhase];
+  const lower = chart.order.slice(chart.activePhase + 1);
+  const maxed = chart.order.slice(0, chart.activePhase);
+  const { start, end, cap } = windowBounds(phase);
+
+  renderChartTabs();
+  ui.chartPhaseInfo.innerHTML = maxed.length
+    ? `Assumes already maxed: <strong>${maxed.join(", ")}</strong>`
+    : "This is your highest owned item. Nothing is maxed yet.";
+
+  ui.windowLabel.textContent = `Levels ${start}\u2013${end}  (page ${chart.activeWindow + 1} of ${windowCount(phase)})`;
+  ui.windowPrev.disabled = chart.activeWindow === 0;
+  ui.windowNext.disabled = chart.activeWindow >= windowCount(phase) - 1;
+  ui.chartPrevItem.disabled = chart.activePhase === 0;
+  ui.chartNextItem.disabled = chart.activePhase >= chart.phases.length - 1;
+
+  if (!lower.length) {
+    ui.chartHead.innerHTML = "";
+    ui.chartBody.innerHTML = `<tr><td class="muted-cell">${phase.rank} is your lowest owned item, so there is nothing to prepare with. Level it straight to ${cap}.</td></tr>`;
+    ui.chartStatus.textContent = "";
+    return;
+  }
+
+  ui.chartHead.innerHTML = `<tr><th class="sticky-col">${phase.rank}</th>${lower.map((name) => `<th>${name}</th>`).join("")}</tr>`;
+  ui.chartBody.innerHTML = rows.map((row) => {
+    const estimated = isEstimatedLevel(row.level);
+    return `<tr class="${estimated ? "estimated-row" : ""}"><td class="mono sticky-col">${row.level}${estimated ? '<span class="est-dot" title="Cost above level 500 comes from the formula">~</span>' : ""}</td>${lower.map((name) => `<td class="mono">${row.levels[name]}</td>`).join("")}</tr>`;
+  }).join("");
+
+  // Surface the genuine (and initially surprising) result that at very high
+  // levels the main item outruns everything else entirely.
+  const allOnes = rows.length > 0 && rows.every((row) => lower.every((name) => row.levels[name] === 1));
+  if (allOnes && start > KNOWN_COST_MAX) {
+    ui.chartStatus.textContent = `Every holding item stays at level 1 through this range. That is correct: ${phase.rank}'s stats grow exponentially while its cost only grows cubically, so its own next level always beats levelling anything else.`;
+  } else {
+    ui.chartStatus.textContent = "";
+  }
 }
 
 /* ------------------------------------------------------------
@@ -913,13 +952,11 @@ function formatNumber(value, digits = 3) {
   if (!Number.isFinite(value)) return "\u2014";
   const absolute = Math.abs(value);
   if (absolute === 0) return "0";
+  if (absolute >= 1e36) return value.toExponential(2).replace("e+", "e");
   const suffixes = [
     [1e33, "Dc"], [1e30, "No"], [1e27, "Oc"], [1e24, "Sp"], [1e21, "Sx"],
     [1e18, "Qi"], [1e15, "Qa"], [1e12, "T"], [1e9, "B"], [1e6, "M"], [1e3, "k"],
   ];
-  // Past the named range, fall back to exponential rather than printing an
-  // absurd mantissa like "2,835,500,000Q".
-  if (absolute >= 1e36) return value.toExponential(2).replace("e+", "e");
   const found = suffixes.find(([threshold]) => absolute >= threshold);
   if (found) return `${(value / found[0]).toLocaleString(undefined, { maximumSignificantDigits: digits })}${found[1]}`;
   return value.toLocaleString(undefined, { maximumSignificantDigits: digits, maximumFractionDigits: 3 });
@@ -934,92 +971,13 @@ function formatStatPercent(value) {
 }
 
 /* ------------------------------------------------------------
-   CHART RENDERING
-   ------------------------------------------------------------ */
-
-function renderMaxLevelOptions() {
-  const options = [];
-  for (let cap = BASE_MAX_LEVEL; cap <= ABSOLUTE_MAX_LEVEL; cap += MAX_LEVEL_STEP) {
-    const label = cap === BASE_MAX_LEVEL ? `${cap} (no unlocks)` : `${cap}`;
-    options.push(`<option value="${cap}">${label}</option>`);
-  }
-  ui.maxLevel.innerHTML = options.join("");
-  ui.maxLevel.value = String(state.maxLevel);
-}
-function renderRankOptions() {
-  ui.highestRank.innerHTML = RANKS.map((rank) => `<option value="${rank.name}">${rank.name}</option>`).join("");
-  ui.highestRank.value = state.highestRank;
-}
-function renderOwnershipInfo() {
-  const count = ownedRanks().length;
-  ui.itemCount.textContent = `${count} item${count === 1 ? "" : "s"} owned (${ownedRanks()[0].name} through ${state.highestRank})`;
-  ui.estimateNote.hidden = state.maxLevel <= KNOWN_COST_MAX;
-  ui.costGrowth.value = state.costGrowth;
-}
-
-function renderChartTabs() {
-  ui.chartTabs.innerHTML = chart.phases.map((phase, index) => {
-    const reachable = index <= chart.cursor;
-    const range = phase.startLevel === null ? "not reached yet" : `from ${phase.startLevel}`;
-    return `<button type="button" class="chart-tab${index === chart.activePhase ? " active" : ""}${reachable ? "" : " pending"}" data-phase="${index}">${phase.rank}<span class="chart-tab-sub">${range}</span></button>`;
-  }).join("");
-}
-
-function renderChart() {
-  const phase = chart.phases[chart.activePhase];
-  const laterRanks = chart.order.slice(chart.activePhase + 1);
-  const maxedRanks = chart.order.slice(0, chart.activePhase);
-
-  renderChartTabs();
-
-  ui.chartPhaseInfo.innerHTML = maxedRanks.length
-    ? `Assumes these are already maxed: <strong>${maxedRanks.join(", ")}</strong>`
-    : `This is your highest owned item. Nothing is maxed yet.`;
-
-  const startLevel = phase.startLevel !== null ? phase.startLevel : 1;
-  const windowStart = startLevel + chart.activeWindow * WINDOW_SIZE;
-  const windowEnd = Math.min(state.maxLevel, windowStart + WINDOW_SIZE - 1);
-  const rows = phase.rows.filter((row) => row.level >= windowStart && row.level <= windowEnd);
-
-  const totalWindows = Math.max(1, Math.ceil((state.maxLevel - startLevel + 1) / WINDOW_SIZE));
-  ui.windowLabel.textContent = `Levels ${windowStart}\u2013${windowEnd}  (page ${chart.activeWindow + 1} of ${totalWindows})`;
-  ui.windowPrev.disabled = chart.activeWindow === 0;
-  ui.windowNext.disabled = chart.activeWindow >= totalWindows - 1;
-  ui.chartPrevItem.disabled = chart.activePhase === 0;
-  ui.chartNextItem.disabled = chart.activePhase >= chart.phases.length - 1;
-
-  if (!laterRanks.length) {
-    ui.chartHead.innerHTML = "";
-    ui.chartBody.innerHTML = `<tr><td class="muted-cell">${phase.rank} is your lowest owned item, so there is nothing left to prepare with. Level it straight to ${state.maxLevel}.</td></tr>`;
-  } else if (!rows.length) {
-    ui.chartHead.innerHTML = "";
-    ui.chartBody.innerHTML = `<tr><td class="muted-cell">Nothing computed for this page yet.</td></tr>`;
-  } else {
-    ui.chartHead.innerHTML = `<tr><th class="sticky-col">${phase.rank}</th>${laterRanks.map((name) => `<th>${name}</th>`).join("")}</tr>`;
-    ui.chartBody.innerHTML = rows.map((row) => {
-      const estimated = isEstimatedLevel(row.level);
-      return `<tr class="${estimated ? "estimated-row" : ""}"><td class="mono sticky-col">${row.level}${estimated ? '<span class="est-dot" title="Cost above level 500 is estimated">~</span>' : ""}</td>${laterRanks.map((name) => `<td class="mono">${row.levels[name]}</td>`).join("")}</tr>`;
-    }).join("");
-  }
-
-  const lastRow = phase.rows[phase.rows.length - 1];
-  if (chart.exhausted && lastRow) {
-    ui.chartStatus.textContent = `Stopped at ${phase.rank} level ${lastRow.level}: no further cost data is available.`;
-  } else if (phase.complete) {
-    ui.chartStatus.textContent = `${phase.rank} is fully mapped to level ${state.maxLevel}.`;
-  } else {
-    ui.chartStatus.textContent = "";
-  }
-}
-
-/* ------------------------------------------------------------
-   EXPLORER (section B) - independent manual sandbox
+   EXPLORER
    ------------------------------------------------------------ */
 
 function ensureExplorerLevels() {
   ownedRanks().forEach((rank) => {
     const current = Number(state.explorerLevels[rank.name]);
-    state.explorerLevels[rank.name] = Number.isInteger(current) ? clamp(current, 1, state.maxLevel) : 1;
+    state.explorerLevels[rank.name] = Number.isInteger(current) ? clamp(current, 1, capFor(rank.name)) : 1;
   });
 }
 function holdingValueForTotal(value) {
@@ -1035,14 +993,18 @@ function explorerSummary(levels) {
     detail.h3 += holdingValueForTotal(stats.h3);
   });
   const equipped = itemStats(state.highestRank, levels[state.highestRank]).equip;
-  const equipFactor = 1 + equipped / 100;
-  const h1Factor = 1 + detail.h1 / 100;
-  const h2Factor = 1 + detail.h2 / 100;
-  const h3Factor = 1 + detail.h3 / 100;
-  return { total: equipFactor * h1Factor * h2Factor * h3Factor, equipFactor, h1Factor, h2Factor, h3Factor, equipped };
+  return {
+    total: (1 + equipped / 100) * (1 + detail.h1 / 100) * (1 + detail.h2 / 100) * (1 + detail.h3 / 100),
+    equipFactor: 1 + equipped / 100,
+    h1Factor: 1 + detail.h1 / 100,
+    h2Factor: 1 + detail.h2 / 100,
+    h3Factor: 1 + detail.h3 / 100,
+    equipped,
+  };
 }
 function explorerAction(rankName, levels) {
   const toLevel = levels[rankName] + 1;
+  if (toLevel > capFor(rankName)) return null;
   const cost = nextCost(toLevel);
   if (!cost) return null;
   const before = explorerSummary(levels).total;
@@ -1060,7 +1022,7 @@ function renderExplorer() {
   const levels = state.explorerLevels;
   const summary = explorerSummary(levels);
   ui.explorerDamage.textContent = `\u00d7${formatNumber(summary.total, 5)}`;
-  ui.explorerBreakdown.textContent = `equip +${formatStatPercent(summary.equipped)}  \u00b7  H1 \u00d7${formatNumber(summary.h1Factor, 5)} \u00b7 H2 \u00d7${formatNumber(summary.h2Factor, 5)} \u00b7 H3 \u00d7${formatNumber(summary.h3Factor, 5)}`;
+  ui.explorerBreakdown.textContent = `H1 \u00d7${formatNumber(summary.h1Factor, 5)} \u00b7 H2 \u00d7${formatNumber(summary.h2Factor, 5)} \u00b7 H3 \u00d7${formatNumber(summary.h3Factor, 5)}`;
 
   const actions = Object.fromEntries(explorerActions(levels).map((action) => [action.rank, action]));
   ui.explorerBody.innerHTML = ownedRanks().slice().reverse().map((rank) => {
@@ -1071,12 +1033,16 @@ function renderExplorer() {
     const parts = [`H1 ${formatStatPercent(stats.h1)}`];
     if (stats.h2) parts.push(`H2 ${formatStatPercent(stats.h2)}`);
     if (stats.h3) parts.push(`H3 ${formatStatPercent(stats.h3)}`);
+    // The highest item is the equipped one, so show its actual equip stat here.
+    const nameCell = isHighest
+      ? `<span class="item-name">${rank.name}<span class="equip-stat" title="Equip stat">+${formatStatPercent(stats.equip)}</span></span>`
+      : `<span class="item-name">${rank.name}</span>`;
     return `<tr class="${isHighest ? "equipped-row" : ""}">
-      <td><span class="item-name">${rank.name}${isHighest ? '<span class="equipped-pill">highest</span>' : ""}</span></td>
-      <td><input class="level-input" data-rank="${rank.name}" type="number" min="1" max="${state.maxLevel}" value="${level}" aria-label="${rank.name} level" /></td>
-      <td class="mono ${action ? "" : "muted-cell"}">${action ? formatCost(action.cost) + (isEstimatedLevel(action.toLevel) ? " ~" : "") : level >= state.maxLevel ? "at cap" : "unknown"}</td>
+      <td>${nameCell}</td>
+      <td><input class="level-input" data-rank="${rank.name}" type="number" min="1" max="${capFor(rank.name)}" value="${level}" aria-label="${rank.name} level" /></td>
+      <td class="mono ${action ? "" : "muted-cell"}">${action ? formatCost(action.cost) + (isEstimatedLevel(action.toLevel) ? " ~" : "") : "at cap"}</td>
       <td class="mono">${parts.join(" \u00b7 ")}</td>
-      <td class="mono ${action ? "" : "muted-cell"}">${action ? `${formatNumber(action.efficiency * 1e6, 5)}% / 1M` : "\u2014"}</td>
+      <td class="mono ${action ? "" : "muted-cell"}">${action ? formatPercent(action.percentGain) : "\u2014"}</td>
     </tr>`;
   }).join("");
 
@@ -1084,26 +1050,53 @@ function renderExplorer() {
   const best = ranked[0];
   if (!best) {
     ui.bestUpgrade.className = "best-upgrade empty";
-    ui.bestUpgrade.innerHTML = "Every owned item is at the current level cap.";
+    ui.bestUpgrade.innerHTML = "Every owned item is at its level cap.";
     ui.rankingBody.innerHTML = "";
   } else {
     ui.bestUpgrade.className = "best-upgrade";
-    ui.bestUpgrade.innerHTML = `<div class="upgrade-title">Level ${best.rank} from ${best.fromLevel} \u2192 ${best.toLevel}</div><p>Costs <strong>${formatCost(best.cost)}</strong>${isEstimatedLevel(best.toLevel) ? " <em>(estimated)</em>" : ""} and raises total damage by <strong>${formatPercent(best.percentGain)}</strong> \u2014 ${formatNumber(best.efficiency * 1e6, 5)}% per 1M.</p>`;
+    ui.bestUpgrade.innerHTML = `<div class="upgrade-title">Level ${best.rank} from ${best.fromLevel} \u2192 ${best.toLevel}</div><p>Costs <strong>${formatCost(best.cost)}</strong>${isEstimatedLevel(best.toLevel) ? " <em>(formula estimate)</em>" : ""} and raises total damage by <strong>${formatPercent(best.percentGain)}</strong> \u2014 ${formatNumber(best.efficiency * 1e6, 5)}% per 1M.</p>`;
     ui.rankingBody.innerHTML = ranked.slice(0, 12).map((action) => `<tr><td><strong>${action.rank}</strong></td><td>${action.fromLevel} \u2192 ${action.toLevel}</td><td class="mono">${formatPercent(action.percentGain)}</td><td class="mono">${formatCost(action.cost)}</td><td class="mono">${formatNumber(action.efficiency * 1e6, 5)}%</td></tr>`).join("");
   }
   saveState();
 }
 
 /* ------------------------------------------------------------
+   TOP CONTROLS
+   ------------------------------------------------------------ */
+
+function renderRankOptions() {
+  ui.highestRank.innerHTML = RANKS.map((rank) => `<option value="${rank.name}">${rank.name}</option>`).join("");
+  ui.highestRank.value = state.highestRank;
+}
+function renderMaxLevelOptions() {
+  const options = [];
+  for (let cap = BASE_MAX_LEVEL; cap <= ABSOLUTE_MAX_LEVEL; cap += MAX_LEVEL_STEP) {
+    options.push(`<option value="${cap}">${cap}${cap === BASE_MAX_LEVEL ? " (no breaks)" : ""}</option>`);
+  }
+  ui.maxLevel.innerHTML = options.join("");
+  ui.maxLevel.value = String(state.maxLevel);
+}
+function renderOwnershipInfo() {
+  const names = ownedNames();
+  ui.itemCount.textContent = `${names.length} item${names.length === 1 ? "" : "s"} owned (${names[0]} through ${state.highestRank})`;
+  const breakable = ownsBreakable();
+  ui.maxLevel.disabled = !breakable;
+  ui.maxLevelHint.textContent = breakable
+    ? "Level breaking applies to SSS only. All other items stay capped at 500."
+    : "Only SSS can break past 500, and you do not own SSS.";
+  ui.estimateNote.hidden = !(breakable && state.maxLevel > KNOWN_COST_MAX);
+}
+
+/* ------------------------------------------------------------
    EVENTS
    ------------------------------------------------------------ */
 
-function onOwnershipChanged() {
+function refreshAll() {
   ensureExplorerLevels();
   renderOwnershipInfo();
-  resetChart();
   renderExplorer();
-  showPhaseWindow(0, 0);
+  buildChart();
+  showWindow(0, 0);
 }
 
 function attachEvents() {
@@ -1111,36 +1104,32 @@ function attachEvents() {
     state.highestRank = ui.highestRank.value;
     state.explorerLevels = {};
     saveState();
-    onOwnershipChanged();
+    refreshAll();
   });
   ui.maxLevel.addEventListener("change", () => {
     state.maxLevel = clamp(Math.round(Number(ui.maxLevel.value) || BASE_MAX_LEVEL), BASE_MAX_LEVEL, ABSOLUTE_MAX_LEVEL);
     saveState();
-    onOwnershipChanged();
-  });
-  ui.costGrowth.addEventListener("change", () => {
-    const value = Number(ui.costGrowth.value);
-    state.costGrowth = Number.isFinite(value) && value > 1 ? value : DEFAULT_COST_GROWTH;
-    ui.costGrowth.value = state.costGrowth;
-    saveState();
-    onOwnershipChanged();
+    refreshAll();
   });
 
   ui.chartTabs.addEventListener("click", (event) => {
     const tab = event.target.closest(".chart-tab");
-    if (!tab) return;
-    showPhaseWindow(Number(tab.dataset.phase), 0);
+    if (tab) showWindow(Number(tab.dataset.phase), 0);
   });
-  ui.chartPrevItem.addEventListener("click", () => showPhaseWindow(Math.max(0, chart.activePhase - 1), 0));
-  ui.chartNextItem.addEventListener("click", () => showPhaseWindow(Math.min(chart.phases.length - 1, chart.activePhase + 1), 0));
-  ui.windowPrev.addEventListener("click", () => showPhaseWindow(chart.activePhase, chart.activeWindow - 1));
-  ui.windowNext.addEventListener("click", () => showPhaseWindow(chart.activePhase, chart.activeWindow + 1));
-  ui.cancelCompute.addEventListener("click", () => { if (activeRun) activeRun.cancelled = true; setComputing(false); ui.chartStatus.textContent = "Calculation cancelled."; });
+  ui.chartPrevItem.addEventListener("click", () => showWindow(chart.activePhase - 1, 0));
+  ui.chartNextItem.addEventListener("click", () => showWindow(chart.activePhase + 1, 0));
+  ui.windowPrev.addEventListener("click", () => showWindow(chart.activePhase, chart.activeWindow - 1));
+  ui.windowNext.addEventListener("click", () => showWindow(chart.activePhase, chart.activeWindow + 1));
+  ui.cancelCompute.addEventListener("click", () => {
+    if (activeRun) activeRun.cancelled = true;
+    setComputing(false);
+    ui.chartStatus.textContent = "Calculation cancelled.";
+  });
 
   ui.explorerBody.addEventListener("change", (event) => {
     const input = event.target.closest("input[data-rank]");
     if (!input) return;
-    state.explorerLevels[input.dataset.rank] = clamp(Math.round(Number(input.value) || 1), 1, state.maxLevel);
+    state.explorerLevels[input.dataset.rank] = clamp(Math.round(Number(input.value) || 1), 1, capFor(input.dataset.rank));
     renderExplorer();
   });
   ui.showRawStats.addEventListener("change", () => { state.options.showRawStats = ui.showRawStats.checked; renderExplorer(); });
@@ -1154,12 +1143,11 @@ function attachEvents() {
     renderExplorer();
   });
   ui.matchChart.addEventListener("click", () => {
-    const phase = chart && chart.phases[chart.activePhase];
-    if (!phase || !phase.rows.length) return;
-    const startLevel = phase.startLevel !== null ? phase.startLevel : 1;
-    const windowStart = startLevel + chart.activeWindow * WINDOW_SIZE;
-    const row = phase.rows.find((entry) => entry.level >= windowStart) || phase.rows[phase.rows.length - 1];
-    state.explorerLevels = { ...row.levels };
+    if (!chart) return;
+    const phase = chart.phases[chart.activePhase];
+    const rows = phase.windows.get(chart.activeWindow);
+    if (!rows || !rows.length) return;
+    state.explorerLevels = { ...rows[0].levels };
     renderExplorer();
     ui.explorerBody.scrollIntoView({ block: "center", behavior: "smooth" });
   });
@@ -1174,14 +1162,10 @@ function initialize() {
   state.maxLevel = clamp(Math.round(Number(state.maxLevel) || BASE_MAX_LEVEL), BASE_MAX_LEVEL, ABSOLUTE_MAX_LEVEL);
   renderRankOptions();
   renderMaxLevelOptions();
-  renderOwnershipInfo();
   ui.showRawStats.checked = state.options.showRawStats;
   ui.useRawHoldingTotals.checked = state.options.useRawHoldingTotals;
   ui.useStagedRounding.checked = state.options.useStagedRounding;
-  ensureExplorerLevels();
   attachEvents();
-  renderExplorer();
-  resetChart();
-  showPhaseWindow(0, 0);
+  refreshAll();
 }
 initialize();
