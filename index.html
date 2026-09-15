@@ -27,13 +27,17 @@
       <section class="card chart-card" aria-labelledby="chart-heading">
         <div class="section-heading">
           <div><p class="eyebrow">MAIN CHART</p><h2 id="chart-heading">Where every other item should be</h2></div>
+          <div class="section-actions">
+            <label class="micro-toggle"><input id="chart-raw-totals" type="checkbox" /><span>raw totals</span></label>
+            <label class="micro-toggle"><input id="chart-staged-rounding" type="checkbox" /><span>staged rounding</span></label>
+          </div>
         </div>
         
 
-        <div class="chart-tabs-row">
-          <button type="button" class="button ghost chart-nav" id="chart-prev-item" aria-label="Previous item">&lsaquo;</button>
-          <div id="chart-tabs" class="chart-tabs" role="tablist"></div>
-          <button type="button" class="button ghost chart-nav" id="chart-next-item" aria-label="Next item">&rsaquo;</button>
+        <div class="item-bar" id="item-bar">
+          <button type="button" class="button secondary" id="chart-prev-item">&lsaquo; Previous item</button>
+          <span class="item-bar-label" id="chart-item-label">—</span>
+          <button type="button" class="button secondary" id="chart-next-item">Next item &rsaquo;</button>
         </div>
         <p class="quiet" id="chart-phase-info">—</p>
 
@@ -94,6 +98,6 @@
 
       <footer><span>UNOFFICIAL FAN TOOL</span> · runs entirely in your browser · <span>made for dungeon enjoyers</span></footer>
     </main>
-    <script src="app.js?v=20260915f"></script>
+    <script src="app.js?v=20260915g"></script>
   </body>
 </html>
