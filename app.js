@@ -549,10 +549,14 @@ function ownedRanks() { return RANKS.slice(0, rankIndex(state.highestRank) + 1);
 function ownedNames() { return ownedRanks().map((rank) => rank.name); }
 function ownsBreakable() { return rankIndex(state.highestRank) >= rankIndex(BREAKABLE_RANK); }
 
-/* Only SSS can be pushed past 500. Everything else is hard-capped. */
+/* LEVEL BREAKING IS CURRENTLY DISABLED.
+   In-game stats after a cap raise do not match the formulas below, so until
+   that behaviour is understood every item is capped at 500. To re-enable,
+   restore the commented body and put the SSS cap selector back in index.html. */
 function capFor(rankName) {
-  if (rankName !== BREAKABLE_RANK) return BASE_MAX_LEVEL;
-  return ownsBreakable() ? state.maxLevel : BASE_MAX_LEVEL;
+  return BASE_MAX_LEVEL;
+  // if (rankName !== BREAKABLE_RANK) return BASE_MAX_LEVEL;
+  // return ownsBreakable() ? state.maxLevel : BASE_MAX_LEVEL;
 }
 
 function parseCostData(text) {
@@ -601,10 +605,7 @@ function clamp(value, minimum, maximum) { return Math.min(maximum, Math.max(mini
 
 const ui = {
   highestRank: document.querySelector("#highest-rank"),
-  maxLevel: document.querySelector("#max-level"),
-  maxLevelHint: document.querySelector("#max-level-hint"),
   itemCount: document.querySelector("#item-count"),
-  estimateNote: document.querySelector("#estimate-note"),
 
   chartTabs: document.querySelector("#chart-tabs"),
   chartPrevItem: document.querySelector("#chart-prev-item"),
@@ -616,10 +617,6 @@ const ui = {
   chartHead: document.querySelector("#chart-head"),
   chartBody: document.querySelector("#chart-body"),
   chartStatus: document.querySelector("#chart-status"),
-  progressWrap: document.querySelector("#progress-wrap"),
-  progressBar: document.querySelector("#progress-bar"),
-  progressLabel: document.querySelector("#progress-label"),
-  cancelCompute: document.querySelector("#cancel-compute"),
 
   explorerBody: document.querySelector("#explorer-body"),
   explorerDamage: document.querySelector("#explorer-damage"),
@@ -856,11 +853,9 @@ async function computeWindow(phase, windowIndex, run) {
     const solveLevel = level >= cap ? Math.max(1, cap - 1) : level;
     rows.push({ level, levels: solveAt(phase.rank, solveLevel, chart.names) });
     sinceYield += 1;
+    // Yield periodically so a long solve can never lock up the tab.
     if (sinceYield >= CHUNK_ROWS) {
       sinceYield = 0;
-      const done = level - start + 1;
-      ui.progressLabel.textContent = `${phase.rank}: solving level ${level} of ${end}`;
-      ui.progressBar.style.width = `${Math.round((done / (end - start + 1)) * 100)}%`;
       await yieldToBrowser();
     }
   }
@@ -869,8 +864,6 @@ async function computeWindow(phase, windowIndex, run) {
 }
 
 function setComputing(isComputing) {
-  ui.progressWrap.hidden = !isComputing;
-  ui.cancelCompute.hidden = !isComputing;
   ui.chartTabs.classList.toggle("is-busy", isComputing);
 }
 
@@ -928,20 +921,27 @@ function renderChart(rows) {
     return;
   }
 
-  ui.chartHead.innerHTML = `<tr><th class="sticky-col">${phase.rank}</th>${lower.map((name) => `<th>${name}</th>`).join("")}</tr>`;
+  // Only show columns for items that actually move on this page. An item that
+  // sits at level 1 for every visible row is just noise.
+  const active = lower.filter((name) => rows.some((row) => row.levels[name] > 1));
+  const hiddenCount = lower.length - active.length;
+
+  if (!active.length) {
+    ui.chartHead.innerHTML = "";
+    ui.chartBody.innerHTML = `<tr><td class="muted-cell">Across levels ${start}\u2013${end}, every other owned item stays at level 1. Put everything into ${phase.rank}.</td></tr>`;
+    ui.chartStatus.textContent = "";
+    return;
+  }
+
+  ui.chartHead.innerHTML = `<tr><th class="sticky-col">${phase.rank}</th>${active.map((name) => `<th>${name}</th>`).join("")}</tr>`;
   ui.chartBody.innerHTML = rows.map((row) => {
     const estimated = isEstimatedLevel(row.level);
-    return `<tr class="${estimated ? "estimated-row" : ""}"><td class="mono sticky-col">${row.level}${estimated ? '<span class="est-dot" title="Cost above level 500 comes from the formula">~</span>' : ""}</td>${lower.map((name) => `<td class="mono">${row.levels[name]}</td>`).join("")}</tr>`;
+    return `<tr class="${estimated ? "estimated-row" : ""}"><td class="mono sticky-col">${row.level}${estimated ? '<span class="est-dot">~</span>' : ""}</td>${active.map((name) => `<td class="mono">${row.levels[name]}</td>`).join("")}</tr>`;
   }).join("");
 
-  // Surface the genuine (and initially surprising) result that at very high
-  // levels the main item outruns everything else entirely.
-  const allOnes = rows.length > 0 && rows.every((row) => lower.every((name) => row.levels[name] === 1));
-  if (allOnes && start > KNOWN_COST_MAX) {
-    ui.chartStatus.textContent = `Every holding item stays at level 1 through this range. That is correct: ${phase.rank}'s stats grow exponentially while its cost only grows cubically, so its own next level always beats levelling anything else.`;
-  } else {
-    ui.chartStatus.textContent = "";
-  }
+  ui.chartStatus.textContent = hiddenCount > 0
+    ? `${hiddenCount} lower item${hiddenCount === 1 ? "" : "s"} hidden: ${hiddenCount === 1 ? "it stays" : "they stay"} at level 1 across this whole page.`
+    : "";
 }
 
 /* ------------------------------------------------------------
@@ -1068,23 +1068,9 @@ function renderRankOptions() {
   ui.highestRank.innerHTML = RANKS.map((rank) => `<option value="${rank.name}">${rank.name}</option>`).join("");
   ui.highestRank.value = state.highestRank;
 }
-function renderMaxLevelOptions() {
-  const options = [];
-  for (let cap = BASE_MAX_LEVEL; cap <= ABSOLUTE_MAX_LEVEL; cap += MAX_LEVEL_STEP) {
-    options.push(`<option value="${cap}">${cap}${cap === BASE_MAX_LEVEL ? " (no breaks)" : ""}</option>`);
-  }
-  ui.maxLevel.innerHTML = options.join("");
-  ui.maxLevel.value = String(state.maxLevel);
-}
 function renderOwnershipInfo() {
   const names = ownedNames();
   ui.itemCount.textContent = `${names.length} item${names.length === 1 ? "" : "s"} owned (${names[0]} through ${state.highestRank})`;
-  const breakable = ownsBreakable();
-  ui.maxLevel.disabled = !breakable;
-  ui.maxLevelHint.textContent = breakable
-    ? "Level breaking applies to SSS only. All other items stay capped at 500."
-    : "Only SSS can break past 500, and you do not own SSS.";
-  ui.estimateNote.hidden = !(breakable && state.maxLevel > KNOWN_COST_MAX);
 }
 
 /* ------------------------------------------------------------
@@ -1106,11 +1092,6 @@ function attachEvents() {
     saveState();
     refreshAll();
   });
-  ui.maxLevel.addEventListener("change", () => {
-    state.maxLevel = clamp(Math.round(Number(ui.maxLevel.value) || BASE_MAX_LEVEL), BASE_MAX_LEVEL, ABSOLUTE_MAX_LEVEL);
-    saveState();
-    refreshAll();
-  });
 
   ui.chartTabs.addEventListener("click", (event) => {
     const tab = event.target.closest(".chart-tab");
@@ -1120,11 +1101,6 @@ function attachEvents() {
   ui.chartNextItem.addEventListener("click", () => showWindow(chart.activePhase + 1, 0));
   ui.windowPrev.addEventListener("click", () => showWindow(chart.activePhase, chart.activeWindow - 1));
   ui.windowNext.addEventListener("click", () => showWindow(chart.activePhase, chart.activeWindow + 1));
-  ui.cancelCompute.addEventListener("click", () => {
-    if (activeRun) activeRun.cancelled = true;
-    setComputing(false);
-    ui.chartStatus.textContent = "Calculation cancelled.";
-  });
 
   ui.explorerBody.addEventListener("change", (event) => {
     const input = event.target.closest("input[data-rank]");
@@ -1159,9 +1135,8 @@ function attachEvents() {
 
 function initialize() {
   if (rankIndex(state.highestRank) < 0) state.highestRank = "SS2";
-  state.maxLevel = clamp(Math.round(Number(state.maxLevel) || BASE_MAX_LEVEL), BASE_MAX_LEVEL, ABSOLUTE_MAX_LEVEL);
+  state.maxLevel = BASE_MAX_LEVEL; // level breaking disabled for now
   renderRankOptions();
-  renderMaxLevelOptions();
   ui.showRawStats.checked = state.options.showRawStats;
   ui.useRawHoldingTotals.checked = state.options.useRawHoldingTotals;
   ui.useStagedRounding.checked = state.options.useStagedRounding;
