@@ -12,6 +12,10 @@ h1,h2{margin:0;line-height:1.05;letter-spacing:-.035em}
 .section-heading h2{font-size:clamp(1.25rem,3vw,1.7rem)}
 .section-actions,.button-row{align-items:center;display:flex;flex-wrap:wrap;gap:9px}
 .setup-grid{display:grid;gap:16px;grid-template-columns:repeat(3,minmax(0,1fr))}
+.setup-grid.two-col{grid-template-columns:repeat(2,minmax(0,1fr))}
+select:disabled{opacity:.45;cursor:not-allowed}
+.equip-stat{color:var(--accent);font-variant-numeric:tabular-nums;font-weight:900;margin-left:8px;white-space:nowrap}
+.estimate-note code{background:rgba(0,0,0,.35);color:#ffe9a8}
 label{color:#b9dfff;display:grid;font-size:.84rem;font-weight:800;gap:6px}
 input,select,textarea{background:#090811;border:1px solid #443653;border-radius:8px;color:var(--text);min-height:40px;padding:8px 10px}
 input:focus,select:focus,textarea:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(112,232,255,.12);outline:none}
