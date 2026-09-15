@@ -13,6 +13,7 @@ h1,h2{margin:0;line-height:1.05;letter-spacing:-.035em}
 .section-actions,.button-row{align-items:center;display:flex;flex-wrap:wrap;gap:9px}
 .setup-grid{display:grid;gap:16px;grid-template-columns:repeat(3,minmax(0,1fr))}
 .setup-grid.two-col{grid-template-columns:repeat(2,minmax(0,1fr))}
+.setup-grid.one-col{grid-template-columns:minmax(0,420px)}
 select:disabled{opacity:.45;cursor:not-allowed}
 .equip-stat{color:var(--accent);font-variant-numeric:tabular-nums;font-weight:900;margin-left:8px;white-space:nowrap}
 .estimate-note code{background:rgba(0,0,0,.35);color:#ffe9a8}
@@ -44,9 +45,9 @@ small,.quiet,.help-text,.formula-note{color:var(--muted);font-size:.78rem;font-w
 .button.ghost{background:transparent;border-color:transparent;color:#8d8397;font-size:.75rem}
 .button.ghost:hover:not(:disabled){background:rgba(255,255,255,.05);color:var(--text)}
 
-.progress-wrap{align-items:center;display:flex;gap:12px;margin-bottom:14px}
-.progress-track{background:#0d0a15;border:1px solid var(--line);border-radius:999px;flex:1;height:9px;overflow:hidden}
-.progress-bar{background:linear-gradient(90deg,var(--cyan),var(--accent));height:100%;width:0;transition:width .18s ease}
+
+
+
 
 .chart-tabs-row{align-items:center;display:flex;gap:6px;margin-bottom:10px}
 .chart-nav{font-size:1.3rem;line-height:1;min-height:36px;padding:2px 10px}
